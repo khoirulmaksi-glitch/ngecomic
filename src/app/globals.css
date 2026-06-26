@@ -1,26 +1,133 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-neon-pink: #ff2d95;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-yellow: #ffd700;
+  --color-neon-green: #39ff14;
+  --color-brutal-black: #0a0a0a;
+  --color-brutal-white: #f5f5f5;
+  --color-brutal-red: #e63946;
+  --color-brutal-orange: #ff6b35;
+  --color-brutal-purple: #7b2d8e;
+  --color-brutal-gray: #1a1a1a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Space Grotesk", system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--color-neon-pink);
+  color: black;
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes border-dance {
+  0% { border-color: var(--color-neon-pink); }
+  25% { border-color: var(--color-neon-cyan); }
+  50% { border-color: var(--color-neon-yellow); }
+  75% { border-color: var(--color-neon-green); }
+  100% { border-color: var(--color-neon-pink); }
+}
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skew-in {
+  from { opacity: 0; transform: skewX(-10deg) translateX(-20px); }
+  to { opacity: 1; transform: skewX(0) translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-glitch { animation: glitch 0.3s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-scanline { animation: scanline 8s linear infinite; }
+.animate-border-dance { animation: border-dance 4s linear infinite; }
+.animate-reveal-up { animation: reveal-up 0.6s ease-out forwards; }
+.animate-skew-in { animation: skew-in 0.5s ease-out forwards; }
+.animate-scale-in { animation: scale-in 0.4s ease-out forwards; }
+
+.stagger-1 { animation-delay: 0.1s; opacity: 0; }
+.stagger-2 { animation-delay: 0.2s; opacity: 0; }
+.stagger-3 { animation-delay: 0.3s; opacity: 0; }
+.stagger-4 { animation-delay: 0.4s; opacity: 0; }
+.stagger-5 { animation-delay: 0.5s; opacity: 0; }
+.stagger-6 { animation-delay: 0.6s; opacity: 0; }
+
+.brutal-border {
+  border: 3px solid var(--color-brutal-white);
+  box-shadow: 8px 8px 0 var(--color-brutal-white);
+}
+
+.brutal-border-pink {
+  border: 3px solid var(--color-neon-pink);
+  box-shadow: 8px 8px 0 var(--color-neon-pink);
+}
+
+.brutal-border-cyan {
+  border: 3px solid var(--color-neon-cyan);
+  box-shadow: 8px 8px 0 var(--color-neon-cyan);
+}
+
+.brutal-border-yellow {
+  border: 3px solid var(--color-neon-yellow);
+  box-shadow: 8px 8px 0 var(--color-neon-yellow);
+}
+
+.noise-bg::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #f5f5f5;
+  }
+  body {
+    background: #0a0a0a;
+    color: #f5f5f5;
+  }
 }
