@@ -73,6 +73,7 @@ export default function FavoritesPage() {
                   <ComicImage
                     src={fav.comic_image}
                     alt={fav.comic_title}
+                    slug={fav.comic_slug}
                     className="w-full h-full group-hover:scale-105 transition duration-300"
                   />
                 </div>

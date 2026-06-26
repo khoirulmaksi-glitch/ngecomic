@@ -24,19 +24,33 @@ export async function GET(
   const search = request.nextUrl.search
   const url = `${BASE}/comic/${pathStr}${search}`
 
-  try {
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-    })
-    const data = await response.json()
-    const duration = Date.now() - start
+  const TIMEOUT = 15000
+  const MAX_RETRIES = 2
 
-    void logApi(`/comic/${pathStr}`, "GET", response.status, duration, null, request.headers.get("x-forwarded-for") || "unknown")
-    // Note: userId tracking for authenticated users via cookie not implemented here
-    // to keep it simple, we're logging without user_id for proxy requests
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT)
 
-    return NextResponse.json(data)
-  } catch {
-    return NextResponse.json({ error: "Failed to fetch comic data" }, { status: 500 })
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      const data = await response.json()
+      const duration = Date.now() - start
+
+      void logApi(`/comic/${pathStr}`, "GET", response.status, duration, null, request.headers.get("x-forwarded-for") || "unknown")
+
+      return NextResponse.json(data)
+    } catch {
+      clearTimeout(timeout)
+      if (attempt === MAX_RETRIES) {
+        return NextResponse.json({ error: "Failed to fetch comic data" }, { status: 500 })
+      }
+      await new Promise(r => setTimeout(r, attempt * 1000))
+    }
   }
+
+  return NextResponse.json({ error: "Failed to fetch comic data" }, { status: 500 })
 }

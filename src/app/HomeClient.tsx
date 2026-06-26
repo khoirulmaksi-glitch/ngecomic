@@ -162,6 +162,7 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
                   <ComicImage
                     src={item.imageSrc}
                     alt={item.title}
+                    slug={item.slug}
                     className="w-full h-full group-hover:scale-105 transition duration-300"
                   />
                 </div>
@@ -229,6 +230,7 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
                   <ComicImage
                     src={update.imageSrc}
                     alt={update.title}
+                    slug={update.slug}
                     className="w-full h-full"
                   />
                 </div>
@@ -358,6 +360,7 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
                 <ComicImage
                   src={item.imageSrc}
                   alt={item.title}
+                  slug={item.slug}
                   className="absolute inset-0 w-full h-full group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-brutal-black via-brutal-black/80 to-transparent">

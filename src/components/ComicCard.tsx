@@ -12,6 +12,7 @@ export default function ComicCard({ comic }: { comic: Comic }) {
         <ComicImage
           src={comic.image}
           alt={comic.title}
+          slug={comic.slug}
           className="w-full h-full group-hover:scale-105 transition duration-300"
         />
       </div>
