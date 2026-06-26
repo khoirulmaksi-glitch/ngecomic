@@ -9,6 +9,7 @@ interface HomeClientProps {
   trending: HomeComicItem[]
   updates: HomeLatestUpdate[]
   ongoing: HomeComicItem[]
+  imageMap: Record<string, string>
 }
 
 const genres = [
@@ -16,7 +17,11 @@ const genres = [
   "Sci-Fi", "Slice of Life", "Adventure", "Thriller",
 ]
 
-export default function HomeClient({ trending, updates, ongoing }: HomeClientProps) {
+function realSrc(item: { slug: string; imageSrc: string }, imageMap: Record<string, string>): string {
+  return imageMap[item.slug] || item.imageSrc
+}
+
+export default function HomeClient({ trending, updates, ongoing, imageMap }: HomeClientProps) {
   const [formState, setFormState] = useState({ name: "", email: "", message: "" })
   const [submitted, setSubmitted] = useState(false)
   const cursorRef = useRef<HTMLDivElement>(null)
@@ -160,9 +165,8 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
               >
                 <div className="aspect-[3/4] overflow-hidden">
                   <ComicImage
-                    src={item.imageSrc}
+                    src={realSrc(item, imageMap)}
                     alt={item.title}
-                    slug={item.slug}
                     className="w-full h-full group-hover:scale-105 transition duration-300"
                   />
                 </div>
@@ -228,9 +232,8 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
               >
                 <div className="shrink-0 w-12 h-16 sm:w-16 sm:h-20 overflow-hidden border border-zinc-700">
                   <ComicImage
-                    src={update.imageSrc}
+                    src={imageMap[update.slug] || update.imageSrc}
                     alt={update.title}
-                    slug={update.slug}
                     className="w-full h-full"
                   />
                 </div>
@@ -358,9 +361,8 @@ export default function HomeClient({ trending, updates, ongoing }: HomeClientPro
                 className="group relative aspect-[3/4] border-2 border-zinc-800 hover:border-neon-green transition-colors overflow-hidden bg-brutal-gray"
               >
                 <ComicImage
-                  src={item.imageSrc}
+                  src={realSrc(item, imageMap)}
                   alt={item.title}
-                  slug={item.slug}
                   className="absolute inset-0 w-full h-full group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-brutal-black via-brutal-black/80 to-transparent">
