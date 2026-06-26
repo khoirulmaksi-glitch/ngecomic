@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import type { HomeComicItem, HomeLatestUpdate } from "@/lib/api"
 import ComicImage from "@/components/ComicImage"
+
+const Beams = dynamic(() => import("@/components/beams/Beams"), { ssr: false })
 
 interface HomeClientProps {
   trending: HomeComicItem[]
@@ -54,6 +57,18 @@ export default function HomeClient({ trending, updates, ongoing, imageMap }: Hom
 
       {/* Hero */}
       <section className="relative min-h-[90vh] flex items-center border-b-3 border-brutal-white overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-40">
+          <Beams
+            beamWidth={1.5}
+            beamHeight={12}
+            beamNumber={10}
+            lightColor="#ff2d95"
+            speed={1.5}
+            noiseIntensity={1.5}
+            scale={0.15}
+            rotation={-15}
+          />
+        </div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,theme(colors.neon.pink/.08),transparent_60%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_48%,theme(colors.neon.cyan/.03)_50%,transparent_52%)] bg-[length:20px_20px]" />
 
