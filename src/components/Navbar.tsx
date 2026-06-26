@@ -52,6 +52,14 @@ export default function Navbar() {
                 >
                   Favorites
                 </Link>
+                <Link
+                  href="/profile"
+                  className={`text-sm font-bold uppercase tracking-widest hover:text-neon-cyan transition-colors ${
+                    pathname === "/profile" ? "text-neon-cyan" : "text-brutal-white"
+                  }`}
+                >
+                  Profile
+                </Link>
 
                 {session.user.role === "admin" && (
                   <Link
@@ -65,7 +73,7 @@ export default function Navbar() {
                 )}
 
                 <div className="flex items-center gap-3 border-l-3 border-brutal-white pl-4">
-                  <span className="text-xs text-zinc-400">
+                  <Link href="/profile" className="text-xs text-zinc-400 hover:text-neon-cyan transition-colors">
                     {session.user.name}
                     <span
                       className="ml-1.5 bg-neon-pink text-black px-1.5 py-0.5 text-[10px] font-bold"
@@ -73,7 +81,7 @@ export default function Navbar() {
                     >
                       Lv.{session.user.level}
                     </span>
-                  </span>
+                  </Link>
                   <button
                     onClick={() => signOut()}
                     className="text-xs font-bold uppercase tracking-wider bg-brutal-red text-white px-3 py-1.5 hover:bg-red-700 transition-colors"
@@ -122,6 +130,7 @@ export default function Navbar() {
             {session ? (
               <>
                 <Link href="/favorites" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Favorites</Link>
+                <Link href="/profile" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Profile</Link>
                 {session.user.role === "admin" && (
                   <Link href="/admin" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Admin</Link>
                 )}
