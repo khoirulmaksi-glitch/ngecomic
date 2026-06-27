@@ -86,6 +86,26 @@ export default async function GenreDetailPage({ params }: PageParams) {
     })
     .filter(Boolean) as Comic[]
 
+  // Resolve data: URI placeholder images by fetching manga detail
+  const dataUriSlugs = comics.filter(c => c.image.startsWith("data:")).map(c => c.slug)
+  if (dataUriSlugs.length > 0) {
+    const detailResults = await Promise.allSettled(
+      dataUriSlugs.map(slug =>
+        fetch(`${API_BASE_URL}/comic/komikstation/manga/${encodeURIComponent(slug)}`, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          next: { revalidate: 60 },
+        }).then(r => r.ok ? r.json() : null)
+      )
+    )
+    const imageMap = new Map<string, string>()
+    detailResults.forEach((res, i) => {
+      if (res.status === "fulfilled" && res.value?.imageSrc && !res.value.imageSrc.startsWith("data:")) {
+        imageMap.set(dataUriSlugs[i], res.value.imageSrc)
+      }
+    })
+    comics = comics.map(c => ({ ...c, image: imageMap.get(c.slug) || c.image }))
+  }
+
   return (
     <div className="bg-surface text-on-surface min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">

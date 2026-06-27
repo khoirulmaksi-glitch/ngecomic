@@ -151,7 +151,7 @@ export function getChapter(chapterSlug: string) {
   return fetchFromAPI<ChapterData>(`/komikstation/chapter/${chapterSlug}`, { cache: "no-store" })
 }
 
-const PROXIED_DOMAINS = ["komikstation.org", "img.klikcdn.com"]
+const PROXIED_DOMAINS = ["komikstation.org", "img.klikcdn.com", "komiku.org"]
 
 export function proxyImage(url: string): string {
   if (!url || url.startsWith("data:")) return url

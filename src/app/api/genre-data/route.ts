@@ -88,11 +88,32 @@ async function fetchFromExternal(path: string): Promise<any> {
   return null
 }
 
+async function resolveComicImages(comics: Comic[]): Promise<Comic[]> {
+  const slugs = comics.filter(c => c.image.startsWith("data:")).map(c => c.slug)
+  if (slugs.length === 0) return comics
+
+  const results = await Promise.allSettled(
+    slugs.map(slug => fetchFromExternal(`komikstation/manga/${slug}`))
+  )
+
+  const map = new Map<string, string>()
+  results.forEach((res, i) => {
+    if (res.status === "fulfilled" && res.value?.imageSrc && !res.value.imageSrc.startsWith("data:")) {
+      map.set(slugs[i], res.value.imageSrc)
+    }
+  })
+
+  return comics.map(c => ({ ...c, image: map.get(c.slug) || c.image }))
+}
+
 async function fetchGenreComics(slug: string): Promise<Comic[]> {
   const data = await fetchFromExternal(`komikstation/genre/${encodeURIComponent(slug)}`)
   if (data) {
     const items = extractResults(data)
-    if (items.length > 0) return items.map(toComic).filter(Boolean) as Comic[]
+    if (items.length > 0) {
+      const comics = items.map(toComic).filter(Boolean) as Comic[]
+      return resolveComicImages(comics)
+    }
   }
   return []
 }

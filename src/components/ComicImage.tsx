@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-const PROXIED_DOMAINS = ["komikstation.org", "img.klikcdn.com"]
+const PROXIED_DOMAINS = ["komikstation.org", "img.klikcdn.com", "komiku.org"]
 
 function proxyImage(url: string): string {
   if (!url || url.startsWith("data:")) return url
