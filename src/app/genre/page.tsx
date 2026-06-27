@@ -96,12 +96,8 @@ export default function GenrePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const genreOrder = useRef<string[]>([])
-  const initRef = useRef(false)
 
   useEffect(() => {
-    if (initRef.current) return
-    initRef.current = true
-
     let cancelled = false
 
     async function loadAll() {
