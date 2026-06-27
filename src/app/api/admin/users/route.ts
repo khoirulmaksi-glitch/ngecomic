@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   const result = await query(
-    "SELECT id, name, email, role, level, total_reads, created_at FROM users ORDER BY created_at DESC"
+    "SELECT id, name, email, role, level, total_reads, banned, created_at FROM users ORDER BY created_at DESC"
   )
 
   return NextResponse.json(result.rows)

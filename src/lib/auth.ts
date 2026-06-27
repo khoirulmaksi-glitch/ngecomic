@@ -27,6 +27,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isValid = await bcrypt.compare(password, user.password)
         if (!isValid) return null
 
+        if (user.banned) return null
+
         if (user.role === 'admin') {
           return {
             id: String(user.id),
@@ -56,6 +58,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const name = profile?.name as string
 
         const existing = await query("SELECT * FROM users WHERE email = $1", [email])
+        if (existing.rows.length > 0 && existing.rows[0].banned) {
+          return false
+        }
+
         if (existing.rows.length === 0) {
           await query(
             "INSERT INTO users (name, email, password, role, level, total_reads) VALUES ($1, $2, '', 'user', 1, 0) ON CONFLICT (email) DO NOTHING",

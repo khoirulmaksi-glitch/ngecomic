@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
   level INTEGER DEFAULT 1,
   total_reads INTEGER DEFAULT 0,
+  banned BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -50,6 +51,9 @@ CREATE TABLE IF NOT EXISTS genre_page_cache (
 CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON api_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_reading_history_user ON reading_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+
+-- Migration: add banned column to existing databases
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE;
 
 -- Insert default admin if not exists (password: admin123)
 INSERT INTO users (name, email, password, role)

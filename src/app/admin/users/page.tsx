@@ -13,6 +13,7 @@ interface AdminUser {
   role: string
   level: number
   total_reads: number
+  banned: boolean
   created_at: string
 }
 
@@ -40,6 +41,26 @@ export default function AdminUsersPage() {
     }
   }, [status, session, router])
 
+  async function toggleBan(user: AdminUser) {
+    const newBanned = !user.banned
+    const label = newBanned ? "ban" : "unban"
+    if (!window.confirm(`Are you sure you want to ${label} ${user.name}?`)) return
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned: newBanned }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, banned: newBanned } : u))
+      )
+    } catch {
+      alert("Failed to update user status")
+    }
+  }
+
   if (loading) {
     return <div className="text-center py-20 text-zinc-500 font-mono">Loading...</div>
   }
@@ -65,7 +86,9 @@ export default function AdminUsersPage() {
               <th className="p-4">Role</th>
               <th className="p-4">Level</th>
               <th className="p-4">Total Reads</th>
+              <th className="p-4">Status</th>
               <th className="p-4">Joined</th>
+              <th className="p-4">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -89,8 +112,31 @@ export default function AdminUsersPage() {
                   <LevelBadge level={user.level} totalReads={user.total_reads} />
                 </td>
                 <td className="p-4">{user.total_reads}</td>
+                <td className="p-4">
+                  <span
+                    className={`px-2 py-0.5 text-xs font-bold uppercase ${
+                      user.banned
+                        ? "text-brutal-red border border-brutal-red"
+                        : "text-neon-green border border-neon-green"
+                    }`}
+                  >
+                    {user.banned ? "Banned" : "Active"}
+                  </span>
+                </td>
                 <td className="p-4 text-xs text-zinc-600">
                   {new Date(user.created_at).toLocaleDateString()}
+                </td>
+                <td className="p-4">
+                  <button
+                    onClick={() => toggleBan(user)}
+                    className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+                      user.banned
+                        ? "bg-neon-green text-brutal-black hover:bg-green-400"
+                        : "bg-brutal-red text-white hover:bg-red-600"
+                    }`}
+                  >
+                    {user.banned ? "Unban" : "Ban"}
+                  </button>
                 </td>
               </tr>
             ))}
