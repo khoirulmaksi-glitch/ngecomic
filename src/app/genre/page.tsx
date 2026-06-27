@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import ComicCard from "@/components/ComicCard"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import type { Comic } from "@/lib/types"
+import GenreSection from "./GenreSection"
+import GenreChips from "./GenreChips"
 
 interface GenreItem {
   label: string
@@ -41,197 +42,208 @@ function toComic(item: any): Comic | null {
   }
 }
 
-const cache = new Map<string, Comic[]>()
-
-async function loadGenre(slug: string): Promise<Comic[]> {
-  const cached = cache.get(slug)
-  if (cached) return cached
-
+async function fetchGenreComics(slug: string): Promise<Comic[]> {
   const endpoints = [
     `/api/proxy?path=genre/${encodeURIComponent(slug)}`,
     `/api/proxy?path=komikstation/genre/${encodeURIComponent(slug)}`,
   ]
-
   const results = await Promise.allSettled(
     endpoints.map(u => fetch(u).then(r => r.ok ? r.json() : Promise.reject()))
   )
-
   for (const r of results) {
     if (r.status !== "fulfilled") continue
     const items = extractResults(r.value)
     if (items.length > 0) {
-      const mapped = items.map(toComic).filter(Boolean) as Comic[]
-      cache.set(slug, mapped)
-      return mapped
+      return items.map(toComic).filter(Boolean) as Comic[]
     }
   }
-
   return []
 }
 
+type GroupedData = Map<string, { label: string; comics: Comic[] }>
+
+function Skeleton() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-pulse">
+      <div className="h-8 w-32 bg-zinc-800 rounded mb-2" />
+      <div className="h-4 w-56 bg-zinc-800 rounded mb-8" />
+      <div className="flex gap-2 mb-10">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-8 w-24 bg-zinc-800 rounded-full" />
+        ))}
+      </div>
+      {Array.from({ length: 3 }).map((_, s) => (
+        <div key={s} className="mb-14">
+          <div className="h-6 w-40 bg-zinc-800 rounded mb-5" />
+          <div className="flex gap-4">
+            {Array.from({ length: 5 }).map((_, c) => (
+              <div key={c} className="flex-1 min-w-0">
+                <div className="aspect-[3/4] bg-zinc-800 rounded mb-2" />
+                <div className="h-3 bg-zinc-800 rounded w-3/4 mb-1" />
+                <div className="h-2 bg-zinc-800 rounded w-1/3" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function GenrePage() {
-  const [genres, setGenres] = useState<GenreItem[]>([])
-  const [selected, setSelected] = useState("")
-  const [comics, setComics] = useState<Comic[]>([])
+  const [search, setSearch] = useState("")
+  const [grouped, setGrouped] = useState<GroupedData>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const genreOrder = useRef<string[]>([])
+  const initRef = useRef(false)
+  const sectionRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
 
   useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
+
     let cancelled = false
 
-    fetch("/api/proxy?path=komikstation/genres")
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return
-        const list: GenreItem[] = data.genres || []
-        if (list.length === 0) {
-          setError("Gagal memuat genre")
-          setLoading(false)
+    async function loadAll() {
+      try {
+        const genreRes = await fetch("/api/proxy?path=komikstation/genres")
+        const genreData = await genreRes.json()
+        const genres: GenreItem[] = genreData.genres || []
+
+        if (cancelled || genres.length === 0) {
+          if (!cancelled) setLoading(false)
           return
         }
-        setGenres(list)
-        const first = list[0].label.toLowerCase()
-        setSelected(first)
 
-        loadGenre(first).then(items => {
-          if (!cancelled) {
-            setComics(items)
-            setLoading(false)
-          }
+        const allFetches = genres.map(async (g) => {
+          const slug = g.label.toLowerCase()
+          const comics = await fetchGenreComics(slug)
+          return { slug, label: g.label, comics }
         })
-      })
-      .catch(() => {
+
+        const results = await Promise.allSettled(allFetches)
+        if (cancelled) return
+
+        const map: GroupedData = new Map()
+        const order: string[] = []
+
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value.comics.length > 0) {
+            map.set(r.value.slug, { label: r.value.label, comics: r.value.comics })
+            order.push(r.value.slug)
+          }
+        }
+
+        genreOrder.current = order
+        setGrouped(map)
+        setLoading(false)
+      } catch {
         if (!cancelled) {
-          setError("Gagal memuat genre")
+          setError("Failed to load genres")
           setLoading(false)
         }
-      })
+      }
+    }
 
+    loadAll()
     return () => { cancelled = true }
   }, [])
 
-  useEffect(() => {
-    if (genres.length === 0) return
-    const toFetch = genres
-      .map(g => g.label.toLowerCase())
-      .filter(s => s !== selected && !cache.has(s))
-    toFetch.forEach(s => { loadGenre(s) })
-  }, [genres, selected])
+  const filteredOrder = useMemo(() => {
+    if (!search.trim()) return genreOrder.current
+    const q = search.toLowerCase()
+    return genreOrder.current.filter(slug => {
+      const entry = grouped.get(slug)
+      return entry?.label.toLowerCase().includes(q)
+    })
+  }, [search, grouped])
 
-  function selectGenre(slug: string) {
-    if (slug === selected) return
-    setSelected(slug)
-    window.history.replaceState(null, "", `/genre?g=${slug}`)
-
-    const cached = cache.get(slug)
-    if (cached) {
-      setComics(cached)
-      return
+  const getSectionRef = useCallback((slug: string) => {
+    if (!sectionRefs.current.has(slug)) {
+      sectionRefs.current.set(slug, null)
     }
+    return {
+      current: sectionRefs.current.get(slug) || null,
+    } as React.RefObject<HTMLDivElement | null>
+  }, [])
 
-    loadGenre(slug).then(items => setComics(items))
-  }
-
-  function prefetchGenre(slug: string) {
-    if (cache.has(slug)) return
-    loadGenre(slug)
-  }
-
-  const selectedLabel = genres.find(g => g.label.toLowerCase() === selected)?.label || selected
-
-  if (loading) {
-    return (
-      <div className="bg-surface text-on-surface min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted font-mono text-sm">Loading...</div>
-      </div>
-    )
-  }
+  if (loading) return <Skeleton />
 
   if (error) {
     return (
-      <div className="bg-surface text-on-surface min-h-screen flex items-center justify-center">
+      <div className="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center gap-4">
+        <span className="text-5xl">📚</span>
         <p className="text-muted font-mono text-sm">{error}</p>
       </div>
     )
   }
 
-  return (
-    <div className="bg-surface text-on-surface min-h-screen flex flex-col">
-      <div className="md:hidden border-b border-outline overflow-x-auto scrollbar-none">
-        <div className="flex gap-1 p-3 whitespace-nowrap">
-          {genres.map(g => {
-            const slug = g.label.toLowerCase()
-            const active = slug === selected
-            return (
-              <button
-                key={g.value}
-                onClick={() => selectGenre(slug)}
-                onMouseEnter={() => prefetchGenre(slug)}
-                className={`px-4 py-2 text-xs font-mono uppercase tracking-wider rounded shrink-0 transition-colors ${
-                  active
-                    ? "bg-brand text-white"
-                    : "bg-surface text-on-surface border border-outline hover:border-brand hover:text-brand"
-                }`}
-              >
-                {g.label}
-              </button>
-            )
-          })}
-        </div>
+  if (grouped.size === 0) {
+    return (
+      <div className="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center gap-4">
+        <span className="text-5xl">🔍</span>
+        <p className="text-muted font-mono text-sm">No comics available.</p>
       </div>
+    )
+  }
 
-      <div className="flex-1 flex max-w-7xl mx-auto w-full">
-        <aside className="hidden md:flex md:w-48 lg:w-56 shrink-0 flex-col border-r border-outline">
-          <div className="p-4 border-b border-outline">
-            <h1 className="font-bold text-lg">Genres</h1>
+  const genreList = filteredOrder
+    .map(slug => ({ label: grouped.get(slug)!.label, value: slug, slug }))
+    .filter(g => grouped.get(g.slug)!.comics.length > 0)
+
+  return (
+    <div className="bg-surface text-on-surface min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-on-surface">Genres</h1>
+          <p className="text-muted text-sm mt-1">Discover manga by genre.</p>
+        </div>
+
+        <div className="relative mb-8 max-w-md">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search genre..."
+            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-outline text-on-surface text-sm outline-none focus:border-brand transition-colors"
+            aria-label="Search genre"
+          />
+        </div>
+
+        {genreList.length > 0 && (
+          <GenreChips
+            genres={genreList.map(g => ({ label: g.label, value: g.slug }))}
+            activeGenre={filteredOrder[0] || ""}
+            onSelect={(slug) => {
+              const el = document.getElementById(`genre-${slug}`)
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+            }}
+          />
+        )}
+
+        {filteredOrder.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-muted font-mono text-sm">No genres match &ldquo;{search}&rdquo;</p>
           </div>
-          <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {genres.map(g => {
-              const slug = g.label.toLowerCase()
-              const active = slug === selected
-              return (
-                <button
-                  key={g.value}
-                  onClick={() => selectGenre(slug)}
-                  onMouseEnter={() => prefetchGenre(slug)}
-                  className={`w-full text-left px-3 py-2 text-sm font-mono uppercase tracking-wider rounded transition-colors ${
-                    active
-                      ? "bg-brand text-white font-bold"
-                      : "text-on-surface hover:bg-brand/10 hover:text-brand"
-                  }`}
-                >
-                  {g.label}
-                </button>
-              )
-            })}
-          </nav>
-        </aside>
+        )}
 
-        <main className="flex-1 p-4 sm:p-6 min-w-0">
-          <div className="hidden md:block mb-6">
-            <h2 className="text-2xl font-bold">{selectedLabel}</h2>
-            <p className="text-muted text-sm mt-1">Menampilkan komik genre {selectedLabel}</p>
-          </div>
-
-          <div className="md:hidden mb-4">
-            <h2 className="text-xl font-bold">{selectedLabel}</h2>
-            <p className="text-muted text-xs mt-0.5">Menampilkan komik genre {selectedLabel}</p>
-          </div>
-
-          {comics.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-muted font-mono">Tidak ada komik untuk genre ini</p>
-            </div>
-          )}
-
-          {comics.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-              {comics.map(comic => (
-                <ComicCard key={comic.slug} comic={comic} />
-              ))}
-            </div>
-          )}
-        </main>
+        {filteredOrder.map(slug => {
+          const entry = grouped.get(slug)
+          if (!entry || entry.comics.length === 0) return null
+          return (
+            <GenreSection
+              key={slug}
+              genreSlug={slug}
+              genreLabel={entry.label}
+              comics={entry.comics}
+              sectionRef={getSectionRef(slug)}
+            />
+          )
+        })}
       </div>
     </div>
   )
