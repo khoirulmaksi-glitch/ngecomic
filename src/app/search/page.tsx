@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import PixelCard from "@/components/PixelCard"
-import { Suspense } from "react"
 
 interface SearchResult {
   title: string
@@ -44,17 +43,18 @@ function extractResults(data: any): SearchResult[] {
   return []
 }
 
-function SearchInner() {
-  const searchParams = useSearchParams()
-  const [query, setQuery] = useState(searchParams.get("q") || "")
+export default function SearchPage() {
+  const router = useRouter()
+  const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [genreName, setGenreName] = useState("")
 
   useEffect(() => {
-    const q = searchParams.get("q")
-    const g = searchParams.get("genre")
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get("q")
+    const g = params.get("genre")
     if (q) {
       setQuery(q)
       doSearch(q)
@@ -225,17 +225,5 @@ function SearchInner() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function SearchPage() {
-  return (
-    <Suspense fallback={
-      <div className="bg-surface text-on-surface min-h-screen py-8">
-        <div className="max-w-7xl mx-auto px-4 text-muted">Loading...</div>
-      </div>
-    }>
-      <SearchInner />
-    </Suspense>
   )
 }
