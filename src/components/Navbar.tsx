@@ -117,7 +117,7 @@ export default function Navbar() {
                       genres.map((g) => (
                         <Link
                           key={g.value}
-                          href={`/search?genre=${g.value}`}
+                          href={`/search?genre=${g.label.toLowerCase()}`}
                           onClick={() => setGenreOpen(false)}
                           className="block px-4 py-2 text-sm text-zinc-300 hover:text-neon-cyan hover:bg-zinc-800 transition-colors"
                         >
@@ -283,7 +283,7 @@ export default function Navbar() {
                 {genres.map((g) => (
                   <Link
                     key={g.value}
-                    href={`/search?genre=${g.value}`}
+                    href={`/search?genre=${g.label.toLowerCase()}`}
                     onClick={() => setMenuOpen(false)}
                     className="block px-3 py-1.5 text-sm text-zinc-400 hover:text-neon-cyan transition-colors"
                   >

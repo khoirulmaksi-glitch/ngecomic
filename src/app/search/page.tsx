@@ -62,7 +62,7 @@ function SearchInner() {
       if (genreRes.ok) {
         const genreData = await genreRes.json()
         const genres: { label: string; value: string }[] = genreData.genres || []
-        const found = genres.find((x) => x.value === g)
+        const found = genres.find((x) => x.label.toLowerCase() === g)
         if (found) setGenreName(found.label)
         else setGenreName(g)
       } else {
