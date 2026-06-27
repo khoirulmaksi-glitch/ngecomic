@@ -139,7 +139,7 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
                 className={`px-4 py-2 text-xs font-mono uppercase tracking-wider rounded shrink-0 transition-colors ${
                   active
                     ? "bg-brand text-white"
-                    : "bg-surface text-muted border border-outline hover:border-brand hover:text-brand"
+                    : "bg-surface text-on-surface border border-outline hover:border-brand hover:text-brand"
                 }`}
               >
                 {g.label}
@@ -166,7 +166,7 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
                   className={`w-full text-left px-3 py-2 text-sm font-mono uppercase tracking-wider rounded transition-colors ${
                     active
                       ? "bg-brand text-white font-bold"
-                      : "text-muted hover:bg-brand/10 hover:text-brand"
+                      : "text-on-surface hover:bg-brand/10 hover:text-brand"
                   }`}
                 >
                   {g.label}
