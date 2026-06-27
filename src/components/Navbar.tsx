@@ -28,7 +28,7 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    fetch("/api/proxy?path=genres")
+    fetch("/api/proxy?path=komikstation/genres")
       .then(r => r.json())
       .then(data => setGenres(data.genres || []))
       .catch(() => {})

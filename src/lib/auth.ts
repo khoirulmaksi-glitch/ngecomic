@@ -1,10 +1,12 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import bcrypt from "bcryptjs"
 import { query } from "./db"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
+    Google,
     Credentials({
       name: "credentials",
       credentials: {
@@ -48,8 +50,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
+    async signIn({ account, profile }) {
+      if (account?.provider === "google") {
+        const email = profile?.email as string
+        const name = profile?.name as string
+
+        const existing = await query("SELECT * FROM users WHERE email = $1", [email])
+        if (existing.rows.length === 0) {
+          await query(
+            "INSERT INTO users (name, email, password, role, level, total_reads) VALUES ($1, $2, '', 'user', 1, 0) ON CONFLICT (email) DO NOTHING",
+            [name, email]
+          )
+        }
+      }
+      return true
+    },
+    async jwt({ token, user, account }) {
+      if (account?.provider === "google") {
+        const result = await query("SELECT * FROM users WHERE email = $1", [token.email])
+        if (result.rows[0]) {
+          const u = result.rows[0]
+          token.id = String(u.id)
+          token.role = u.role
+          token.level = u.level
+          token.total_reads = u.total_reads
+          token.name = u.name
+        }
+      } else if (user) {
         token.id = user.id
         token.role = user.role as string
         token.level = user.level as number
