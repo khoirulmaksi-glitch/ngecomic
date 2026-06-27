@@ -37,12 +37,17 @@ export default async function TerbaruPage() {
   }))
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-brutal-white">Latest Updates</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {comics.map((comic) => (
-          <ComicCard key={comic.slug} comic={comic} />
-        ))}
+    <div className="bg-surface text-on-surface min-h-screen py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Latest Updates</h1>
+          <p className="text-muted text-sm mt-1">Fresh updates and new chapters</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5">
+          {comics.map((comic) => (
+            <ComicCard key={comic.slug} comic={comic} />
+          ))}
+        </div>
       </div>
     </div>
   )

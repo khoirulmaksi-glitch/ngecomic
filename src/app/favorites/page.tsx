@@ -46,55 +46,60 @@ export default function FavoritesPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center text-zinc-500 font-mono">
-        Loading...
+      <div className="bg-surface text-on-surface min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 py-20 text-center text-muted font-mono">
+          Loading...
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-4xl font-black tracking-tighter mb-8 text-brutal-white">
-        My <span className="text-neon-pink">Favorites</span>
-      </h1>
+    <div className="bg-surface text-on-surface min-h-screen py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">My Favorites</h1>
+          <p className="text-muted text-sm mt-1">Comics you&apos;ve bookmarked</p>
+        </div>
 
-      {favorites.length === 0 ? (
-        <div className="text-center py-20 text-zinc-600">
-          <p className="text-lg font-mono">No favorites yet</p>
-          <Link href="/" className="text-neon-cyan hover:text-neon-pink mt-2 inline-block font-bold uppercase tracking-wider text-sm transition-colors">
-            Browse projects &rarr;
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {favorites.map((fav) => (
-            <PixelCard key={fav.id} variant="pink" className="border-2 border-zinc-800 hover:border-neon-pink bg-brutal-black">
-              <div className="relative">
-                <Link href={`/comic/${fav.comic_slug}`} className="group block">
-                  <div className="aspect-[3/4] overflow-hidden bg-brutal-gray">
-                    <ComicImage
-                      src={fav.comic_image}
-                      alt={fav.comic_title}
-                      className="w-full h-full group-hover:scale-105 transition duration-300"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-bold text-sm line-clamp-2 text-brutal-white">
-                      {fav.comic_title}
-                    </h3>
-                  </div>
-                </Link>
-                <button
-                  onClick={() => removeFavorite(fav.comic_slug)}
-                  className="absolute top-2 right-2 bg-brutal-red text-white w-7 h-7 flex items-center justify-center text-xs font-bold"
-                >
-                  X
-                </button>
-              </div>
-            </PixelCard>
-          ))}
-        </div>
-      )}
+        {favorites.length === 0 ? (
+          <div className="text-center py-20 text-muted">
+            <p className="text-lg font-mono">No favorites yet</p>
+            <Link href="/" className="text-brand hover:text-accent-hover mt-2 inline-block font-bold uppercase tracking-wider text-sm transition-colors">
+              Browse projects &rarr;
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+            {favorites.map((fav) => (
+              <PixelCard key={fav.id} variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
+                <div className="relative">
+                  <Link href={`/comic/${fav.comic_slug}`} className="group block">
+                    <div className="aspect-[3/4] overflow-hidden bg-card-surface">
+                      <ComicImage
+                        src={fav.comic_image}
+                        alt={fav.comic_title}
+                        className="w-full h-full group-hover:scale-105 transition duration-300"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
+                        {fav.comic_title}
+                      </h3>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => removeFavorite(fav.comic_slug)}
+                    className="absolute top-2 right-2 bg-danger text-white w-7 h-7 flex items-center justify-center text-xs font-bold"
+                  >
+                    X
+                  </button>
+                </div>
+              </PixelCard>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

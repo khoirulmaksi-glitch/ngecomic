@@ -7,7 +7,7 @@ import PixelCard from "@/components/PixelCard"
 
 export default function ComicCard({ comic }: { comic: Comic }) {
   return (
-    <PixelCard variant="pink" className="border-2 border-zinc-800 hover:border-neon-cyan bg-brutal-black">
+    <PixelCard variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
       <Link
         href={`/comic/${comic.slug}`}
         className="group block"
@@ -20,10 +20,10 @@ export default function ComicCard({ comic }: { comic: Comic }) {
           />
         </div>
         <div className="p-3">
-          <h3 className="font-bold text-sm line-clamp-2 mb-1 text-brutal-white">
+          <h3 className="font-bold text-sm line-clamp-2 mb-1 text-on-surface">
             {comic.title}
           </h3>
-          <div className="flex items-center justify-between text-xs text-zinc-500">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span className="font-mono">{comic.type || "Manga"}</span>
             {comic.rating && (
               <span className="flex items-center gap-1">
@@ -33,7 +33,7 @@ export default function ComicCard({ comic }: { comic: Comic }) {
             )}
           </div>
           {comic.chapter && (
-            <p className="text-xs text-neon-pink mt-1 font-mono">{comic.chapter}</p>
+            <p className="text-xs text-brand mt-1 font-mono">{comic.chapter}</p>
           )}
         </div>
       </Link>
