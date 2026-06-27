@@ -214,6 +214,18 @@ export default function SearchPage() {
                     <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
                       {item.title}
                     </h3>
+                    {item.genre && (
+                      <span
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          router.push(`/search?genre=${item.genre.toLowerCase()}`)
+                        }}
+                        className="inline-block mt-1.5 px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
+                      >
+                        {item.genre}
+                      </span>
+                    )}
                     {(item.type || item.latestChapter || item.chapter) && (
                       <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter || item.chapter}</p>
                     )}
