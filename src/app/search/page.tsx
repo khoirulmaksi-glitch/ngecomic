@@ -15,20 +15,30 @@ interface SearchResult {
   image?: string
   type: string
   latestChapter?: string
+  chapter?: string
+  link?: string
   genre: string
   description: string
+  rating?: string
+  status?: string | null
 }
 
 function isPlaceholder(src: string | undefined): boolean {
   return !src || src.startsWith("data:")
 }
 
+function extractSlugFromLink(link?: string): string {
+  if (!link) return ""
+  const match = link.match(/\/manga\/([^/]+)/)
+  return match ? match[1] : ""
+}
+
 function extractResults(data: any): SearchResult[] {
   if (!data) return []
   if (Array.isArray(data)) return data
   if (data.seriesList) return Array.isArray(data.seriesList) ? data.seriesList : []
-  if (data.data) return Array.isArray(data.data) ? data.data : []
   if (data.comics) return Array.isArray(data.comics) ? data.comics : []
+  if (data.data) return Array.isArray(data.data) ? data.data : []
   if (data.results) return Array.isArray(data.results) ? data.results : []
   if (data.manga) return Array.isArray(data.manga) ? data.manga : []
   return []
@@ -73,8 +83,8 @@ function SearchInner() {
     }
 
     const endpoints = [
-      `/api/proxy?path=komikstation/genre/${encodeURIComponent(g)}`,
       `/api/proxy?path=genre/${encodeURIComponent(g)}`,
+      `/api/proxy?path=komikstation/genre/${encodeURIComponent(g)}`,
     ]
 
     for (const url of endpoints) {
@@ -120,8 +130,8 @@ function SearchInner() {
 
   function extractSlug(item: SearchResult): string {
     if (item.slug) return item.slug
-    const match = item.href?.match(/\/manga\/([^/]+)/)
-    return match ? match[1] : ""
+    if (item.link) return extractSlugFromLink(item.link)
+    return ""
   }
 
   return (
@@ -167,11 +177,11 @@ function SearchInner() {
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
-          {results.map((item) => {
+          {results.map((item, idx) => {
             const slug = extractSlug(item)
             if (!slug) return null
             return (
-              <PixelCard key={item.slug || item.href} variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
+              <PixelCard key={slug || idx} variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
                 <Link
                   href={`/comic/${slug}`}
                   className="group block"
@@ -204,8 +214,8 @@ function SearchInner() {
                     <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
                       {item.title}
                     </h3>
-                    {(item.type || item.latestChapter) && (
-                      <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter}</p>
+                    {(item.type || item.latestChapter || item.chapter) && (
+                      <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter || item.chapter}</p>
                     )}
                   </div>
                 </Link>
