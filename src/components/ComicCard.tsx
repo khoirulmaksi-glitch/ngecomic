@@ -1,11 +1,12 @@
 "use client"
 
+import { memo } from "react"
 import Link from "next/link"
 import type { Comic } from "@/lib/types"
 import ComicImage from "@/components/ComicImage"
 import PixelCard from "@/components/PixelCard"
 
-export default function ComicCard({ comic }: { comic: Comic }) {
+function ComicCard({ comic }: { comic: Comic }) {
   return (
     <PixelCard variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
       <Link
@@ -40,3 +41,5 @@ export default function ComicCard({ comic }: { comic: Comic }) {
     </PixelCard>
   )
 }
+
+export default memo(ComicCard)

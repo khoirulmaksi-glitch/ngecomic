@@ -17,8 +17,7 @@ function getTopPicks(comics: Comic[]): Comic[] {
   const sorted = [...comics].sort((a, b) => {
     const ra = parseFloat(a.rating) || 0
     const rb = parseFloat(b.rating) || 0
-    if (ra !== rb) return rb - ra
-    return 0
+    return ra !== rb ? rb - ra : 0
   })
   return sorted.slice(0, 3)
 }
@@ -42,8 +41,7 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
     const vw = el.clientWidth
     const visible = getVisibleCount(vw)
     const cardW = (vw - (visible - 1) * 16) / visible
-    const amount = (cardW + 16) * (dir === "left" ? -visible : visible) * 0.8
-    el.scrollBy({ left: amount, behavior: "smooth" })
+    el.scrollBy({ left: (cardW + 16) * (dir === "left" ? -visible : visible) * 0.8, behavior: "smooth" })
   }, [])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -60,8 +58,7 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
     e.preventDefault()
     const el = carouselRef.current
     if (!el) return
-    const x = e.pageX - el.getBoundingClientRect().left
-    const walk = (x - dragRef.current.startX) * 1.2
+    const walk = (e.pageX - el.getBoundingClientRect().left - dragRef.current.startX) * 1.2
     el.scrollLeft = dragRef.current.scrollLeft - walk
   }, [])
 
@@ -71,8 +68,9 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
   }, [])
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!carouselRef.current) return
-    carouselRef.current.scrollLeft += e.deltaY
+    const el = carouselRef.current
+    if (!el) return
+    el.scrollLeft += e.deltaY
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -81,19 +79,12 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
   }, [scrollDir])
 
   return (
-    <section
-      id={`genre-${genreSlug}`}
-      data-genre={genreSlug}
-      className="mb-14 scroll-mt-24"
-      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 480px" }}
-    >
+    <section id={`genre-${genreSlug}`} data-genre={genreSlug} className="mb-14 scroll-mt-24" style={{ contentVisibility: "auto" }}>
       <div className="flex items-end justify-between mb-5">
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h2 className="text-xl sm:text-2xl font-bold text-on-surface truncate">{genreLabel}</h2>
-            <span className="text-xs text-muted font-mono bg-surface border border-outline px-2 py-0.5 shrink-0">
-              {comics.length}
-            </span>
+            <span className="text-xs text-muted font-mono bg-surface border border-outline px-2 py-0.5 shrink-0">{comics.length}</span>
           </div>
           {topPicks.length > 0 && (
             <p className="text-xs text-muted flex items-center gap-1 flex-wrap">
@@ -125,45 +116,34 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
       >
         <button
           onClick={() => scrollDir("left")}
-          className="absolute left-0 top-0 bottom-0 z-10 w-14 flex items-center justify-start bg-gradient-to-r from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
+          className="absolute left-0 top-0 bottom-0 z-10 w-12 flex items-center justify-start opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out"
           aria-label="Scroll left"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white ml-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-white ml-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </span>
         </button>
         <button
           onClick={() => scrollDir("right")}
-          className="absolute right-0 top-0 bottom-0 z-10 w-14 flex items-center justify-end bg-gradient-to-l from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
+          className="absolute right-0 top-0 bottom-0 z-10 w-12 flex items-center justify-end opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out"
           aria-label="Scroll right"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white mr-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-white mr-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
           </span>
         </button>
 
         <div
           ref={carouselRef}
           className="flex gap-4 overflow-x-auto py-1 cursor-grab active:cursor-grabbing no-scrollbar"
-          style={{
-            scrollSnapType: "x mandatory",
-            scrollBehavior: "smooth",
-            WebkitOverflowScrolling: "touch",
-            willChange: "scroll-position",
-          }}
+          style={{ scrollBehavior: "smooth" }}
           onWheel={handleWheel}
           tabIndex={0}
           onKeyDown={handleKeyDown}
-          role="listbox"
           aria-label={`${genreLabel} comics`}
         >
           {comics.map((comic) => (
-            <div
-              key={comic.slug}
-              className="shrink-0 w-[calc(50%-8px)] sm:w-[calc((100%/3)-11px)] md:w-[calc((100%/4)-12px)] lg:w-[calc((100%/5)-13px)] will-change-transform"
-              style={{ scrollSnapAlign: "start" }}
-              role="option"
-            >
+            <div key={comic.slug} className="shrink-0 w-[calc(50%-8px)] sm:w-[calc((100%/3)-11px)] md:w-[calc((100%/4)-12px)] lg:w-[calc((100%/5)-13px)]">
               <ComicCard comic={comic} />
             </div>
           ))}
