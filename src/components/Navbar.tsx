@@ -4,9 +4,8 @@ import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
 import { usePathname, useRouter } from "next/navigation"
 import { getLevelName } from "./LevelBadge"
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useTheme } from "./ThemeProvider"
-import type { Genre } from "@/lib/api"
 
 export default function Navbar() {
   const { data: session } = useSession()
@@ -16,35 +15,12 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [scrolled, setScrolled] = useState(false)
-  const [genres, setGenres] = useState<Genre[]>([])
-  const [genreOpen, setGenreOpen] = useState(false)
-  const genreRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
-
-  useEffect(() => {
-    fetch("/api/proxy?path=komikstation/genres")
-      .then(r => r.json())
-      .then(data => setGenres(data.genres || []))
-      .catch(() => {})
-  }, [])
-
-  // Close genre dropdown on outside click
-  useEffect(() => {
-    if (!genreOpen) return
-    const handler = (e: MouseEvent) => {
-      if (genreRef.current && !genreRef.current.contains(e.target as Node)) {
-        setGenreOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [genreOpen])
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -90,44 +66,15 @@ export default function Navbar() {
                 </Link>
               ))}
 
-              {/* Genre dropdown */}
-              <div ref={genreRef} className="relative">
-                <button
-                  onMouseEnter={() => setGenreOpen(true)}
-                  onClick={() => setGenreOpen(!genreOpen)}
-                  className="text-sm font-bold uppercase tracking-widest text-brutal-white hover:text-neon-cyan transition-colors flex items-center gap-1"
-                >
-                  Genre
-                  <svg
-                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    className={`transition-transform ${genreOpen ? "rotate-180" : ""}`}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-
-                {genreOpen && (
-                  <div
-                    className="absolute top-full left-0 mt-2 w-56 max-h-80 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl shadow-black/40 z-50 py-2"
-                    onMouseLeave={() => setGenreOpen(false)}
-                  >
-                    {genres.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-zinc-500">Loading...</div>
-                    ) : (
-                      genres.map((g) => (
-                        <Link
-                          key={g.value}
-                          href={`/search?genre=${g.label.toLowerCase()}`}
-                          onClick={() => setGenreOpen(false)}
-                          className="block px-4 py-2 text-sm text-zinc-300 hover:text-neon-cyan hover:bg-zinc-800 transition-colors"
-                        >
-                          {g.label}
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <Link
+                href="/genre"
+                className={`text-sm font-bold uppercase tracking-widest hover:text-neon-cyan transition-colors relative group ${
+                  pathname.startsWith("/genre") ? "text-neon-cyan" : "text-brutal-white"
+                }`}
+              >
+                Genre
+                <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-neon-pink scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+              </Link>
             </div>
 
             {/* Search bar */}
@@ -271,27 +218,7 @@ export default function Navbar() {
             <Link href="/populer" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Populer</Link>
             <Link href="/terbaru" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Terbaru</Link>
 
-            {/* Mobile genre list */}
-            <details className="group">
-              <summary className="text-sm font-bold uppercase tracking-widest text-brutal-white cursor-pointer list-none flex items-center gap-1">
-                Genre
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-open:rotate-180">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </summary>
-              <div className="mt-2 ml-2 grid grid-cols-2 gap-1">
-                {genres.map((g) => (
-                  <Link
-                    key={g.value}
-                    href={`/search?genre=${g.label.toLowerCase()}`}
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-3 py-1.5 text-sm text-zinc-400 hover:text-neon-cyan transition-colors"
-                  >
-                    {g.label}
-                  </Link>
-                ))}
-              </div>
-            </details>
+            <Link href="/genre" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Genre</Link>
 
             {session ? (
               <>
