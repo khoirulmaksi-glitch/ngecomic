@@ -168,6 +168,7 @@ export default function PixelCard({ variant = 'default', gap = undefined, speed 
   // IntersectionObserver: only allow canvas for cards near viewport
   useEffect(() => {
     const el = cardRef.current;
+    const currentId = id.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setVisible(entry.isIntersecting),
@@ -176,15 +177,16 @@ export default function PixelCard({ variant = 'default', gap = undefined, speed 
     obs.observe(el);
     return () => {
       obs.disconnect();
-      unregisterPaint(id.current);
+      unregisterPaint(currentId);
       pixelsRef.current = [];
     };
   }, []);
 
   // Canvas lifecycle: create + register on hover+visible, dispose on leave
   useEffect(() => {
+    const currentId = id.current;
     if (!active || !visible) {
-      unregisterPaint(id.current);
+      unregisterPaint(currentId);
       pixelsRef.current = [];
       return;
     }
@@ -221,7 +223,7 @@ export default function PixelCard({ variant = 'default', gap = undefined, speed 
     pixelsRef.current = pxs;
 
     let idle = false;
-    registerPaint(id.current, () => {
+    registerPaint(currentId, () => {
       if (idle) return;
       ctx.clearRect(0, 0, width, height);
       let allIdle = true;
@@ -230,11 +232,11 @@ export default function PixelCard({ variant = 'default', gap = undefined, speed 
         if (!px.isIdle) allIdle = false;
       }
       idle = allIdle;
-      if (idle) unregisterPaint(id.current);
+      if (idle) unregisterPaint(currentId);
     });
 
     return () => {
-      unregisterPaint(id.current);
+      unregisterPaint(currentId);
       pixelsRef.current = [];
     };
   }, [active, visible, variant, gap, speed, colors]);
