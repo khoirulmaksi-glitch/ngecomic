@@ -16,11 +16,14 @@ interface Props {
 function GenreChips({ genres, activeGenre, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [spyActive, setSpyActive] = useState(activeGenre)
+  const spyRef = useRef(spyActive)
   const tickingRef = useRef(false)
+
+  spyRef.current = spyActive
 
   useEffect(() => {
     const sections = genres
-      .map(g => document.getElementById(`genre-${g.label.toLowerCase()}`))
+      .map(g => document.getElementById(`genre-${g.value}`))
       .filter(Boolean) as HTMLElement[]
 
     if (sections.length === 0) return
@@ -34,7 +37,7 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
 
       requestAnimationFrame(() => {
         tickingRef.current = false
-        let best = spyActive
+        let best = spyRef.current
         let bestDist = Infinity
         const cy = window.scrollY + NAVBAR_H + CUSHION
 
@@ -43,12 +46,12 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
           const dist = Math.abs(cy - top)
           if (dist < bestDist) {
             bestDist = dist
-            const slug = el.getAttribute("data-genre") || spyActive
+            const slug = el.getAttribute("data-genre") || spyRef.current
             best = slug
           }
         }
 
-        if (best !== spyActive) {
+        if (best !== spyRef.current) {
           setSpyActive(best)
         }
       })
@@ -57,7 +60,9 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
     window.addEventListener("scroll", onScroll, { passive: true })
     onScroll()
     return () => window.removeEventListener("scroll", onScroll)
-  }, [genres, spyActive])
+    // spyRef is used inside, so it doesn't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genres])
 
   useEffect(() => {
     const btn = scrollRef.current?.querySelector(`[data-chip="${activeGenre}"]`) as HTMLButtonElement | null
@@ -83,11 +88,10 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
       </h3>
       <div
         ref={scrollRef}
-        className="flex gap-2 overflow-x-auto pb-1"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex gap-2 overflow-x-auto pb-1 no-scrollbar"
       >
         {genres.map(g => {
-          const slug = g.label.toLowerCase()
+          const slug = g.value
           const active = slug === spyActive
           return (
             <button

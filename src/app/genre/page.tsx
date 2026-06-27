@@ -149,14 +149,26 @@ export default function GenrePage() {
     return () => { cancelled = true }
   }, [])
 
-  const filteredOrder = useMemo(() => {
-    if (!search.trim()) return genreOrder.current
+  const chipGenres = useMemo(() => {
+    if (!search.trim()) {
+      return genreOrder.current
+        .map(slug => {
+          const entry = grouped.get(slug)
+          return entry ? { label: entry.label, value: slug } : null
+        })
+        .filter(Boolean) as GenreItem[]
+    }
     const q = search.toLowerCase()
-    return genreOrder.current.filter(slug => {
-      const entry = grouped.get(slug)
-      return entry?.label.toLowerCase().includes(q)
-    })
+    return genreOrder.current
+      .map(slug => {
+        const entry = grouped.get(slug)
+        if (!entry || !entry.label.toLowerCase().includes(q)) return null
+        return { label: entry.label, value: slug }
+      })
+      .filter(Boolean) as GenreItem[]
   }, [search, grouped])
+
+  const activeChip = chipGenres[0]?.value || ""
 
   const handleChipSelect = useCallback((slug: string) => {
     const el = document.getElementById(`genre-${slug}`)
@@ -183,19 +195,7 @@ export default function GenrePage() {
     )
   }
 
-  const sections = useMemo(() => {
-    return filteredOrder
-      .map(slug => {
-        const entry = grouped.get(slug)
-        if (!entry || entry.comics.length === 0) return null
-        return { slug, label: entry.label, comics: entry.comics }
-      })
-      .filter(Boolean) as { slug: string; label: string; comics: Comic[] }[]
-  }, [filteredOrder, grouped])
-
-  const chipGenres = useMemo(() => {
-    return sections.map(s => ({ label: s.label, value: s.slug }))
-  }, [sections])
+  const q = search.toLowerCase().trim()
 
   return (
     <div className="bg-surface text-on-surface min-h-screen">
@@ -220,27 +220,29 @@ export default function GenrePage() {
         </div>
 
         {chipGenres.length > 0 && (
-          <GenreChips
-            genres={chipGenres}
-            activeGenre={sections[0]?.slug || ""}
-            onSelect={handleChipSelect}
-          />
+          <GenreChips genres={chipGenres} activeGenre={activeChip} onSelect={handleChipSelect} />
         )}
 
-        {sections.length === 0 && (
+        {chipGenres.length === 0 && search.trim() && (
           <div className="text-center py-16">
             <p className="text-muted font-mono text-sm">No genres match &ldquo;{search}&rdquo;</p>
           </div>
         )}
 
-        {sections.map(s => (
-          <GenreSection
-            key={s.slug}
-            genreSlug={s.slug}
-            genreLabel={s.label}
-            comics={s.comics}
-          />
-        ))}
+        {genreOrder.current.map(slug => {
+          const entry = grouped.get(slug)
+          if (!entry || entry.comics.length === 0) return null
+          const hide = q && !entry.label.toLowerCase().includes(q)
+          return (
+            <div key={slug} className={hide ? 'hidden' : ''}>
+              <GenreSection
+                genreSlug={slug}
+                genreLabel={entry.label}
+                comics={entry.comics}
+              />
+            </div>
+          )
+        })}
       </div>
     </div>
   )

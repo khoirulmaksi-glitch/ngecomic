@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useRef, useState, useCallback, useEffect, useMemo } from "react"
+import { memo, useRef, useCallback, useMemo } from "react"
 import Link from "next/link"
 import ComicCard from "@/components/ComicCard"
 import type { Comic } from "@/lib/types"
@@ -23,38 +23,24 @@ function getTopPicks(comics: Comic[]): Comic[] {
   return sorted.slice(0, 3)
 }
 
+function getVisibleCount(vw: number): number {
+  if (vw < 640) return 2
+  if (vw < 768) return 3
+  if (vw < 1024) return 4
+  return 5
+}
+
 function GenreSection({ genreSlug, genreLabel, comics }: Props) {
   const carouselRef = useRef<HTMLDivElement>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
   const dragRef = useRef({ dragging: false, startX: 0, scrollLeft: 0 })
 
   const topPicks = useMemo(() => getTopPicks(comics), [comics])
-
-  const updateButtons = useCallback(() => {
-    const el = carouselRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 10)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
-  }, [])
-
-  useEffect(() => {
-    const el = carouselRef.current
-    if (!el) return
-    el.addEventListener("scroll", updateButtons, { passive: true })
-    updateButtons()
-    return () => el.removeEventListener("scroll", updateButtons)
-  }, [updateButtons])
 
   const scrollDir = useCallback((dir: "left" | "right") => {
     const el = carouselRef.current
     if (!el) return
     const vw = el.clientWidth
-    let visible: number
-    if (vw < 640) visible = 2
-    else if (vw < 768) visible = 3
-    else if (vw < 1024) visible = 4
-    else visible = 5
+    const visible = getVisibleCount(vw)
     const cardW = (vw - (visible - 1) * 16) / visible
     const amount = (cardW + 16) * (dir === "left" ? -visible : visible) * 0.8
     el.scrollBy({ left: amount, behavior: "smooth" })
@@ -99,6 +85,7 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
       id={`genre-${genreSlug}`}
       data-genre={genreSlug}
       className="mb-14 scroll-mt-24"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 480px" }}
     >
       <div className="flex items-end justify-between mb-5">
         <div className="min-w-0">
@@ -129,44 +116,41 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
         </Link>
       </div>
 
-      <div className="relative group/carousel">
-        {canScrollLeft && (
-          <button
-            onClick={() => scrollDir("left")}
-            className="absolute left-0 top-0 bottom-0 z-10 w-14 flex items-center justify-start bg-gradient-to-r from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
-            aria-label="Scroll left"
-          >
-            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white hover:scale-110 hover:bg-black/70 transition-transform duration-200 ease-out ml-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            </span>
-          </button>
-        )}
-        {canScrollRight && (
-          <button
-            onClick={() => scrollDir("right")}
-            className="absolute right-0 top-0 bottom-0 z-10 w-14 flex items-center justify-end bg-gradient-to-l from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
-            aria-label="Scroll right"
-          >
-            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white hover:scale-110 hover:bg-black/70 transition-transform duration-200 ease-out mr-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </span>
-          </button>
-        )}
+      <div
+        className="relative group/carousel"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <button
+          onClick={() => scrollDir("left")}
+          className="absolute left-0 top-0 bottom-0 z-10 w-14 flex items-center justify-start bg-gradient-to-r from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
+          aria-label="Scroll left"
+        >
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white ml-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </span>
+        </button>
+        <button
+          onClick={() => scrollDir("right")}
+          className="absolute right-0 top-0 bottom-0 z-10 w-14 flex items-center justify-end bg-gradient-to-l from-surface via-surface/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200 ease-out will-change-transform"
+          aria-label="Scroll right"
+        >
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white mr-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
+        </button>
 
         <div
           ref={carouselRef}
-          className="flex gap-4 overflow-x-auto py-1 cursor-grab active:cursor-grabbing will-change-scroll"
+          className="flex gap-4 overflow-x-auto py-1 cursor-grab active:cursor-grabbing no-scrollbar"
           style={{
             scrollSnapType: "x mandatory",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            WebkitOverflowScrolling: "touch",
             scrollBehavior: "smooth",
+            WebkitOverflowScrolling: "touch",
+            willChange: "scroll-position",
           }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
           tabIndex={0}
           onKeyDown={handleKeyDown}
