@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import { memo, useRef, useState, useEffect, useCallback } from "react"
 
 interface GenreItem {
   label: string
@@ -13,51 +13,68 @@ interface Props {
   onSelect: (slug: string) => void
 }
 
-export default function GenreChips({ genres, activeGenre, onSelect }: Props) {
+function GenreChips({ genres, activeGenre, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [spyActive, setSpyActive] = useState(activeGenre)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const tickingRef = useRef(false)
 
   useEffect(() => {
-    const sections = genres.map(g => document.getElementById(`genre-${g.label.toLowerCase()}`)).filter(Boolean) as HTMLElement[]
+    const sections = genres
+      .map(g => document.getElementById(`genre-${g.label.toLowerCase()}`))
+      .filter(Boolean) as HTMLElement[]
+
     if (sections.length === 0) return
 
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const slug = entry.target.getAttribute("data-genre")
-            if (slug) {
-              setSpyActive(slug)
-            }
+    const NAVBAR_H = 80
+    const CUSHION = 20
+
+    function onScroll() {
+      if (tickingRef.current) return
+      tickingRef.current = true
+
+      requestAnimationFrame(() => {
+        tickingRef.current = false
+        let best = spyActive
+        let bestDist = Infinity
+        const cy = window.scrollY + NAVBAR_H + CUSHION
+
+        for (const el of sections) {
+          const top = el.getBoundingClientRect().top + window.scrollY
+          const dist = Math.abs(cy - top)
+          if (dist < bestDist) {
+            bestDist = dist
+            const slug = el.getAttribute("data-genre") || spyActive
+            best = slug
           }
         }
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
-    )
 
-    sections.forEach(el => observerRef.current?.observe(el))
-    return () => observerRef.current?.disconnect()
-  }, [genres])
+        if (best !== spyActive) {
+          setSpyActive(best)
+        }
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [genres, spyActive])
 
   useEffect(() => {
-    const btn = chipRefs.current.get(spyActive)
+    const btn = scrollRef.current?.querySelector(`[data-chip="${activeGenre}"]`) as HTMLButtonElement | null
     if (btn && scrollRef.current) {
-      const container = scrollRef.current
-      const btnRect = btn.getBoundingClientRect()
-      const containerRect = container.getBoundingClientRect()
-      if (btnRect.left < containerRect.left || btnRect.right > containerRect.right) {
+      const cr = scrollRef.current.getBoundingClientRect()
+      const br = btn.getBoundingClientRect()
+      if (br.left < cr.left || br.right > cr.right) {
         btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
       }
     }
-  }, [spyActive])
+  }, [activeGenre])
 
-  function handleClick(slug: string) {
+  const handleClick = useCallback((slug: string) => {
     onSelect(slug)
     const el = document.getElementById(`genre-${slug}`)
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
+  }, [onSelect])
 
   return (
     <div className="mb-8">
@@ -75,11 +92,11 @@ export default function GenreChips({ genres, activeGenre, onSelect }: Props) {
           return (
             <button
               key={g.value}
-              ref={(el) => { if (el) chipRefs.current.set(slug, el) }}
+              data-chip={slug}
               onClick={() => handleClick(slug)}
-              className={`shrink-0 px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-full border transition-all duration-200 ${
+              className={`shrink-0 px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-full border transition-all duration-200 ease-out will-change-transform ${
                 active
-                  ? "bg-brand text-white border-brand shadow-md shadow-brand/20 scale-105"
+                  ? "bg-brand text-white border-brand scale-105"
                   : "bg-surface text-muted border-outline hover:border-brand hover:text-brand hover:scale-105"
               }`}
             >
@@ -91,3 +108,5 @@ export default function GenreChips({ genres, activeGenre, onSelect }: Props) {
     </div>
   )
 }
+
+export default memo(GenreChips)

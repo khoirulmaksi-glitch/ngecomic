@@ -97,7 +97,6 @@ export default function GenrePage() {
   const [error, setError] = useState("")
   const genreOrder = useRef<string[]>([])
   const initRef = useRef(false)
-  const sectionRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
 
   useEffect(() => {
     if (initRef.current) return
@@ -159,13 +158,9 @@ export default function GenrePage() {
     })
   }, [search, grouped])
 
-  const getSectionRef = useCallback((slug: string) => {
-    if (!sectionRefs.current.has(slug)) {
-      sectionRefs.current.set(slug, null)
-    }
-    return {
-      current: sectionRefs.current.get(slug) || null,
-    } as React.RefObject<HTMLDivElement | null>
+  const handleChipSelect = useCallback((slug: string) => {
+    const el = document.getElementById(`genre-${slug}`)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [])
 
   if (loading) return <Skeleton />
@@ -188,9 +183,19 @@ export default function GenrePage() {
     )
   }
 
-  const genreList = filteredOrder
-    .map(slug => ({ label: grouped.get(slug)!.label, value: slug, slug }))
-    .filter(g => grouped.get(g.slug)!.comics.length > 0)
+  const sections = useMemo(() => {
+    return filteredOrder
+      .map(slug => {
+        const entry = grouped.get(slug)
+        if (!entry || entry.comics.length === 0) return null
+        return { slug, label: entry.label, comics: entry.comics }
+      })
+      .filter(Boolean) as { slug: string; label: string; comics: Comic[] }[]
+  }, [filteredOrder, grouped])
+
+  const chipGenres = useMemo(() => {
+    return sections.map(s => ({ label: s.label, value: s.slug }))
+  }, [sections])
 
   return (
     <div className="bg-surface text-on-surface min-h-screen">
@@ -214,36 +219,28 @@ export default function GenrePage() {
           />
         </div>
 
-        {genreList.length > 0 && (
+        {chipGenres.length > 0 && (
           <GenreChips
-            genres={genreList.map(g => ({ label: g.label, value: g.slug }))}
-            activeGenre={filteredOrder[0] || ""}
-            onSelect={(slug) => {
-              const el = document.getElementById(`genre-${slug}`)
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-            }}
+            genres={chipGenres}
+            activeGenre={sections[0]?.slug || ""}
+            onSelect={handleChipSelect}
           />
         )}
 
-        {filteredOrder.length === 0 && (
+        {sections.length === 0 && (
           <div className="text-center py-16">
             <p className="text-muted font-mono text-sm">No genres match &ldquo;{search}&rdquo;</p>
           </div>
         )}
 
-        {filteredOrder.map(slug => {
-          const entry = grouped.get(slug)
-          if (!entry || entry.comics.length === 0) return null
-          return (
-            <GenreSection
-              key={slug}
-              genreSlug={slug}
-              genreLabel={entry.label}
-              comics={entry.comics}
-              sectionRef={getSectionRef(slug)}
-            />
-          )
-        })}
+        {sections.map(s => (
+          <GenreSection
+            key={s.slug}
+            genreSlug={s.slug}
+            genreLabel={s.label}
+            comics={s.comics}
+          />
+        ))}
       </div>
     </div>
   )
