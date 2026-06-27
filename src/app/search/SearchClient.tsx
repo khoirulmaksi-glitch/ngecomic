@@ -275,20 +275,22 @@ export default function SearchClient({ initialResults, initialGenreName, initial
                       </div>
                       <div className="p-3">
                         <h3 className="font-bold text-sm line-clamp-2 text-on-surface">{item.title}</h3>
-                        {item.genre && (
-                          <span
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); switchGenre(item.genre) }}
-                            onMouseEnter={() => prefetchGenre(item.genre)}
-                            className="inline-block mt-1.5 px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
-                          >
-                            {item.genre}
-                          </span>
-                        )}
                         {(item.type || item.latestChapter || item.chapter) && (
                           <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter || item.chapter}</p>
                         )}
                       </div>
                     </Link>
+                    {item.genre && (
+                      <div className="px-3 pb-3">
+                        <span
+                          onClick={() => switchGenre(item.genre)}
+                          onMouseEnter={() => prefetchGenre(item.genre)}
+                          className="inline-block px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
+                        >
+                          {item.genre}
+                        </span>
+                      </div>
+                    )}
                   </PixelCard>
                 )
               })}
