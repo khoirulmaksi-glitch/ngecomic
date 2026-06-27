@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useRef, useState, useEffect, useCallback } from "react"
+import { memo, useRef, useState, useEffect } from "react"
 
 interface GenreItem {
   label: string
@@ -16,56 +16,39 @@ interface Props {
 function GenreChips({ genres, activeGenre, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [spyActive, setSpyActive] = useState(activeGenre)
-  const spyRef = useRef(spyActive)
-  const tickingRef = useRef(false)
-
-  spyRef.current = spyActive
 
   useEffect(() => {
-    const sections = genres
+    setSpyActive(activeGenre)
+  }, [activeGenre])
+
+  useEffect(() => {
+    const els = genres
       .map(g => document.getElementById(`genre-${g.value}`))
       .filter(Boolean) as HTMLElement[]
 
-    if (sections.length === 0) return
+    if (els.length === 0) return
 
-    const NAVBAR_H = 80
-    const CUSHION = 20
-
-    function onScroll() {
-      if (tickingRef.current) return
-      tickingRef.current = true
-
-      requestAnimationFrame(() => {
-        tickingRef.current = false
-        let best = spyRef.current
-        let bestDist = Infinity
-        const cy = window.scrollY + NAVBAR_H + CUSHION
-
-        for (const el of sections) {
-          const top = el.getBoundingClientRect().top + window.scrollY
-          const dist = Math.abs(cy - top)
-          if (dist < bestDist) {
-            bestDist = dist
-            const slug = el.getAttribute("data-genre") || spyRef.current
-            best = slug
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const slug = entry.target.getAttribute("data-genre")
+            if (slug) setSpyActive(slug)
           }
         }
+      },
+      {
+        rootMargin: "-80px 0px -50% 0px",
+        threshold: 0,
+      }
+    )
 
-        if (best !== spyRef.current) {
-          setSpyActive(best)
-        }
-      })
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener("scroll", onScroll)
-    // spyRef is used inside, so it doesn't need to be in deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    for (const el of els) observer.observe(el)
+    return () => observer.disconnect()
   }, [genres])
 
   useEffect(() => {
-    const btn = scrollRef.current?.querySelector(`[data-chip="${activeGenre}"]`) as HTMLButtonElement | null
+    const btn = scrollRef.current?.querySelector(`[data-chip="${spyActive}"]`) as HTMLButtonElement | null
     if (btn && scrollRef.current) {
       const cr = scrollRef.current.getBoundingClientRect()
       const br = btn.getBoundingClientRect()
@@ -73,13 +56,7 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
         btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
       }
     }
-  }, [activeGenre])
-
-  const handleClick = useCallback((slug: string) => {
-    onSelect(slug)
-    const el = document.getElementById(`genre-${slug}`)
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [onSelect])
+  }, [spyActive])
 
   return (
     <div className="mb-8">
@@ -97,11 +74,11 @@ function GenreChips({ genres, activeGenre, onSelect }: Props) {
             <button
               key={g.value}
               data-chip={slug}
-              onClick={() => handleClick(slug)}
-              className={`shrink-0 px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-full border transition-all duration-200 ease-out will-change-transform ${
+              onClick={() => onSelect(slug)}
+              className={`shrink-0 px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-full border transition-colors duration-200 ease-out ${
                 active
-                  ? "bg-brand text-white border-brand scale-105"
-                  : "bg-surface text-muted border-outline hover:border-brand hover:text-brand hover:scale-105"
+                  ? "bg-brand text-white border-brand"
+                  : "bg-surface text-muted border-outline hover:border-brand hover:text-brand"
               }`}
             >
               {g.label}

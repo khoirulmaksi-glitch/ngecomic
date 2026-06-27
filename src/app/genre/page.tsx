@@ -16,6 +16,62 @@ interface GenreItem {
   value: string
 }
 
+function SectionSkeleton() {
+  return (
+    <div className="mb-14 animate-pulse">
+      <div className="flex items-end justify-between mb-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-7 w-32 bg-zinc-800 rounded" />
+            <div className="h-5 w-10 bg-zinc-800 rounded" />
+          </div>
+          <div className="h-4 w-64 bg-zinc-800 rounded mt-2" />
+        </div>
+      </div>
+      <div className="flex gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex-1 min-w-0">
+            <div className="aspect-[3/4] bg-zinc-800 rounded mb-2" />
+            <div className="h-3 bg-zinc-800 rounded w-3/4 mb-1" />
+            <div className="h-2 bg-zinc-800 rounded w-1/3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LazySection({ slug, label, comics }: { slug: string; label: string; comics: Comic[] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.unobserve(el)
+        }
+      },
+      { rootMargin: "400px" }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} id={`genre-${slug}`} data-genre={slug}>
+      {visible ? (
+        <GenreSection genreSlug={slug} genreLabel={label} comics={comics} />
+      ) : (
+        <SectionSkeleton />
+      )}
+    </div>
+  )
+}
+
 function Skeleton() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-pulse">
@@ -174,10 +230,9 @@ export default function GenrePage() {
           const entry = grouped.get(slug)
           if (!entry || entry.comics.length === 0) return null
           const hide = q && !entry.label.toLowerCase().includes(q)
+          if (hide) return null
           return (
-            <div key={slug} className={hide ? "hidden" : ""}>
-              <GenreSection genreSlug={slug} genreLabel={entry.label} comics={entry.comics} />
-            </div>
+            <LazySection key={slug} slug={slug} label={entry.label} comics={entry.comics} />
           )
         })}
       </div>

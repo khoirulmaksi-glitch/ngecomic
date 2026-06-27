@@ -79,7 +79,7 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
   }, [scrollDir])
 
   return (
-    <section id={`genre-${genreSlug}`} data-genre={genreSlug} className="mb-14 scroll-mt-24" style={{ contentVisibility: "auto" }}>
+    <section id={`genre-${genreSlug}`} data-genre={genreSlug} className="mb-14 scroll-mt-24" style={{ contentVisibility: "auto", contain: "layout paint style" }}>
       <div className="flex items-end justify-between mb-5">
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
@@ -103,7 +103,7 @@ function GenreSection({ genreSlug, genreLabel, comics }: Props) {
         >
           View More
           <span className="inline-block transition-transform duration-200 ease-out group-hover:translate-x-0.5">→</span>
-          <span className="absolute bottom-0 left-0 w-0 h-px bg-brand transition-all duration-200 ease-out group-hover:w-full" />
+          <span className="absolute bottom-0 left-0 h-px bg-brand origin-left transition-transform duration-200 ease-out scale-x-0 group-hover:scale-x-100" />
         </Link>
       </div>
 
