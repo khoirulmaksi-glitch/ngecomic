@@ -42,6 +42,8 @@ function extractResults(data: any): SearchResult[] {
   return []
 }
 
+const cache = new Map<string, SearchResult[]>()
+
 function SkeletonGrid() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5 animate-pulse">
@@ -65,6 +67,8 @@ export default function SearchPage() {
   const [searched, setSearched] = useState(false)
   const [genreName, setGenreName] = useState("")
   const genreListRef = useRef<{ label: string; value: string }[] | null>(null)
+  const currentGenreRef = useRef("")
+  const pendingFetchRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -72,9 +76,9 @@ export default function SearchPage() {
     const g = params.get("genre")
     if (q) {
       setQuery(q)
-      doSearch(q)
+      loadSearch(q)
     } else if (g) {
-      fetchGenreComics(g)
+      switchGenre(g)
     } else {
       setLoading(false)
     }
@@ -93,66 +97,103 @@ export default function SearchPage() {
     return []
   }
 
-  async function fetchGenreComics(g: string) {
-    setLoading(true)
-    setSearched(true)
-    setResults([])
-    setGenreName("")
-
-    const genres = (await loadGenreList()) || []
-    const found = genres.find((x) => x.label.toLowerCase() === g)
-    setGenreName(found?.label || g)
-
+  async function fetchGenreFromApi(g: string): Promise<SearchResult[]> {
     const endpoints = [
       `/api/proxy?path=genre/${encodeURIComponent(g)}`,
       `/api/proxy?path=komikstation/genre/${encodeURIComponent(g)}`,
     ]
 
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url)
-        if (!res.ok) continue
-        const data = await res.json()
-        const extracted = extractResults(data)
-        if (extracted.length > 0) {
-          setResults(extracted)
-          setLoading(false)
-          return
-        }
-      } catch {
-        continue
+    const results = await Promise.allSettled(
+      endpoints.map((url) =>
+        fetch(url).then((r) => (r.ok ? r.json() : Promise.reject()))
+      )
+    )
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        const extracted = extractResults(result.value)
+        if (extracted.length > 0) return extracted
       }
     }
+    return []
+  }
 
+  async function fetchGenreComics(g: string) {
+    pendingFetchRef.current?.abort()
+    const controller = new AbortController()
+    pendingFetchRef.current = controller
+
+    currentGenreRef.current = g
+    setSearched(true)
+    setGenreName("")
+
+    const genres = (await loadGenreList()) || []
+    const found = genres.find((x) => x.label.toLowerCase() === g)
+    const name = found?.label || g
+    setGenreName(name)
+
+    const cached = cache.get(g)
+    if (cached) {
+      setResults(cached)
+      setLoading(false)
+    }
+
+    const data = await fetchGenreFromApi(g)
+    if (controller.signal.aborted) return
+
+    cache.set(g, data)
+    setResults(data)
     setLoading(false)
   }
 
-  async function doSearch(q: string) {
+  async function loadSearch(q: string) {
     if (!q.trim()) return
+    pendingFetchRef.current?.abort()
+    const controller = new AbortController()
+    pendingFetchRef.current = controller
+
     setLoading(true)
     setSearched(true)
     setResults([])
     setGenreName("")
     try {
       const res = await fetch(`/api/proxy?path=search&q=${encodeURIComponent(q)}`)
+      if (controller.signal.aborted) return
       const data = await res.json()
       setResults(extractResults(data))
     } catch {
-      setResults([])
+      if (!controller.signal.aborted) setResults([])
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }
 
   function switchGenre(g: string) {
-    window.history.replaceState(null, "", `/search?genre=${g}`)
-    fetchGenreComics(g.toLowerCase())
+    const key = g.toLowerCase()
+    window.history.replaceState(null, "", `/search?genre=${key}`)
+
+    if (cache.has(key)) {
+      const genres = genreListRef.current || []
+      const found = genres.find((x) => x.label.toLowerCase() === key)
+      setGenreName(found?.label || key)
+      setResults(cache.get(key)!)
+      setLoading(false)
+      setSearched(true)
+    }
+
+    fetchGenreComics(key)
+  }
+
+  function prefetchGenre(g: string) {
+    const key = g.toLowerCase()
+    if (cache.has(key) || currentGenreRef.current === key) return
+    fetchGenreComics(key)
   }
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     window.history.replaceState(null, "", `/search?q=${encodeURIComponent(query)}`)
-    doSearch(query)
+    loadSearch(query)
   }, [query])
 
   function extractSlug(item: SearchResult): string {
@@ -190,7 +231,7 @@ export default function SearchPage() {
           </button>
         </form>
 
-        {loading && <SkeletonGrid />}
+        {loading && results.length === 0 && <SkeletonGrid />}
 
         {!loading && searched && results.length === 0 && (
           <p className="text-center text-muted py-10 font-mono">
@@ -201,7 +242,7 @@ export default function SearchPage() {
           </p>
         )}
 
-        <div className={`transition-opacity duration-300 ${loading ? "opacity-0" : "opacity-100"}`}>
+        <div className={`transition-opacity duration-200 ${loading && results.length === 0 ? "opacity-0" : "opacity-100"}`}>
           {results.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
               {results.map((item, idx) => {
@@ -248,6 +289,7 @@ export default function SearchPage() {
                               e.stopPropagation()
                               switchGenre(item.genre)
                             }}
+                            onMouseEnter={() => prefetchGenre(item.genre)}
                             className="inline-block mt-1.5 px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
                           >
                             {item.genre}
