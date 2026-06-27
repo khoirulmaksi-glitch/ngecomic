@@ -4,10 +4,10 @@ import type { Comic } from "@/lib/types"
 
 const BASE = process.env.API_BASE_URL || "https://www.sankavollerei.web.id"
 const CACHE_TTL = 300
+const FETCH_TIMEOUT = 6000
 
 const PROXY_SERVICES = [
   "https://api.allorigins.win/raw?url=",
-  "https://corsproxy.io/?url=",
 ]
 
 interface GenreItem {
@@ -53,9 +53,9 @@ function toComic(item: any): Comic | null {
   }
 }
 
-async function fetchJson(url: string): Promise<any> {
+async function fetchJson(url: string, label: string): Promise<any> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10000)
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
   try {
     const res = await fetch(url, {
       headers: {
@@ -64,27 +64,33 @@ async function fetchJson(url: string): Promise<any> {
       signal: controller.signal,
     })
     clearTimeout(timeout)
-    if (!res.ok) return null
+    if (!res.ok) {
+      console.error(`  fetchJson ${label}: HTTP ${res.status} from ${url.slice(0, 80)}`)
+      return null
+    }
     return res.json()
-  } catch {
+  } catch (e) {
     clearTimeout(timeout)
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error(`  fetchJson ${label}: ${msg} (${url.slice(0, 80)})`)
     return null
   }
 }
 
 async function fetchFromExternal(path: string): Promise<any> {
   const targetUrl = `${BASE}/comic/${path}`
-  for (const url of [targetUrl, ...PROXY_SERVICES.map(s => `${s}${encodeURIComponent(targetUrl)}`)]) {
-    const data = await fetchJson(url)
+  const urls = [targetUrl, ...PROXY_SERVICES.map(s => `${s}${encodeURIComponent(targetUrl)}`)]
+  for (let i = 0; i < urls.length; i++) {
+    const label = `path=${path} attempt=${i}`
+    const data = await fetchJson(urls[i], label)
     if (data) return data
   }
   return null
 }
 
 async function fetchGenreComics(slug: string): Promise<Comic[]> {
-  for (const path of [`genre/${encodeURIComponent(slug)}`, `komikstation/genre/${encodeURIComponent(slug)}`]) {
-    const data = await fetchFromExternal(path)
-    if (!data) continue
+  const data = await fetchFromExternal(`komikstation/genre/${encodeURIComponent(slug)}`)
+  if (data) {
     const items = extractResults(data)
     if (items.length > 0) return items.map(toComic).filter(Boolean) as Comic[]
   }
@@ -92,9 +98,14 @@ async function fetchGenreComics(slug: string): Promise<Comic[]> {
 }
 
 async function buildGenreData(): Promise<GenreData[]> {
+  console.error("  buildGenreData: fetching genre list...")
   const genreData = await fetchFromExternal("komikstation/genres")
-  if (!genreData) return []
+  if (!genreData) {
+    console.error("  buildGenreData: FAILED to fetch genre list from all endpoints")
+    return []
+  }
   const genres: GenreItem[] = genreData.genres || []
+  console.error(`  buildGenreData: got ${genres.length} genres`)
   if (genres.length === 0) return []
 
   const results = await Promise.allSettled(
@@ -117,33 +128,62 @@ async function buildGenreData(): Promise<GenreData[]> {
 export async function GET() {
   try {
     // Try cache first — single SQL query
-    const cached = await query(
-      "SELECT data, updated_at FROM genre_page_cache WHERE id = 1"
-    )
+    console.error("=== GET /api/genre-data: checking DB cache ===")
+    let cached
+    try {
+      cached = await query(
+        "SELECT data, updated_at FROM genre_page_cache WHERE id = 1"
+      )
+    } catch (dbErr) {
+      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr)
+      console.error("=== DB cache query failed ===\n", msg)
+      // Table may not exist — proceed without cache
+      cached = { rows: [] }
+    }
 
     if (cached.rows.length > 0) {
       const { data, updated_at } = cached.rows[0]
       const age = (Date.now() - new Date(updated_at).getTime()) / 1000
+      console.error(`  cache hit, age=${age.toFixed(0)}s`)
       if (age < CACHE_TTL) {
         return NextResponse.json(data)
       }
+      console.error("  cache stale, refetching...")
+    } else {
+      console.error("  cache empty, fetching fresh data...")
     }
 
-    // Cache miss or stale — fetch fresh data
-    const data = await buildGenreData()
+    // Cache miss or stale — fetch fresh data (with overall timeout)
+    const data = await (async () => {
+      let timer: ReturnType<typeof setTimeout>
+      const result = await Promise.race([
+        buildGenreData(),
+        new Promise<GenreData[]>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Global fetch timeout")), 25000)
+        }),
+      ])
+      clearTimeout(timer!)
+      return result
+    })()
 
     // Store in cache (single INSERT or UPDATE)
-    await query(
-      `INSERT INTO genre_page_cache (id, data, updated_at)
-       VALUES (1, $1::jsonb, NOW())
-       ON CONFLICT (id)
-       DO UPDATE SET data = $1::jsonb, updated_at = NOW()`,
-      [JSON.stringify({ genres: data })]
-    )
+    try {
+      await query(
+        `INSERT INTO genre_page_cache (id, data, updated_at)
+         VALUES (1, $1::jsonb, NOW())
+         ON CONFLICT (id)
+         DO UPDATE SET data = $1::jsonb, updated_at = NOW()`,
+        [JSON.stringify({ genres: data })]
+      )
+    } catch (storeErr) {
+      const msg = storeErr instanceof Error ? storeErr.message : String(storeErr)
+      console.error("=== DB cache store failed (non-fatal) ===\n", msg)
+    }
 
     return NextResponse.json({ genres: data })
   } catch (e) {
-    console.error("Genre data fetch failed:", e)
-    return NextResponse.json({ error: "Failed to load genre data" }, { status: 500 })
+    const msg = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e)
+    console.error("=== Genre data fetch failed ===\n", msg)
+    return NextResponse.json({ error: "Failed to load genre data", detail: msg }, { status: 500 })
   }
 }
