@@ -12,20 +12,31 @@ interface SearchResult {
   slug: string
   href: string
   thumbnail: string
+  image?: string
   type: string
+  latestChapter?: string
   genre: string
   description: string
 }
 
-interface GenreInfo {
-  label: string
-  value: string
+function isPlaceholder(src: string | undefined): boolean {
+  return !src || src.startsWith("data:")
+}
+
+function extractResults(data: any): SearchResult[] {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (data.seriesList) return Array.isArray(data.seriesList) ? data.seriesList : []
+  if (data.data) return Array.isArray(data.data) ? data.data : []
+  if (data.comics) return Array.isArray(data.comics) ? data.comics : []
+  if (data.results) return Array.isArray(data.results) ? data.results : []
+  if (data.manga) return Array.isArray(data.manga) ? data.manga : []
+  return []
 }
 
 function SearchInner() {
   const searchParams = useSearchParams()
   const [query, setQuery] = useState(searchParams.get("q") || "")
-  const [genre, setGenre] = useState(searchParams.get("genre") || "")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -36,11 +47,8 @@ function SearchInner() {
     const g = searchParams.get("genre")
     if (q) {
       setQuery(q)
-      setGenre("")
       doSearch(q)
     } else if (g) {
-      setGenre(g)
-      setQuery("")
       fetchGenreComics(g)
     }
   }, [])
@@ -48,21 +56,45 @@ function SearchInner() {
   async function fetchGenreComics(g: string) {
     setLoading(true)
     setSearched(true)
+
     try {
       const genreRes = await fetch("/api/proxy?path=komikstation/genres")
-      const genreData = await genreRes.json()
-      const genres: GenreInfo[] = genreData.genres || []
-      const found = genres.find((x) => x.value === g)
-      setGenreName(found?.label || g)
-
-      const res = await fetch(`/api/proxy?path=komikstation/genre/${g}`)
-      const data = await res.json()
-      setResults(data.data || data.comics || data.results || [])
+      if (genreRes.ok) {
+        const genreData = await genreRes.json()
+        const genres: { label: string; value: string }[] = genreData.genres || []
+        const found = genres.find((x) => x.value === g)
+        if (found) setGenreName(found.label)
+        else setGenreName(g)
+      } else {
+        setGenreName(g)
+      }
     } catch {
-      setResults([])
-    } finally {
-      setLoading(false)
+      setGenreName(g)
     }
+
+    const endpoints = [
+      `/api/proxy?path=komikstation/genre/${encodeURIComponent(g)}`,
+      `/api/proxy?path=genre/${encodeURIComponent(g)}`,
+    ]
+
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url)
+        if (!res.ok) continue
+        const data = await res.json()
+        const extracted = extractResults(data)
+        if (extracted.length > 0) {
+          setResults(extracted)
+          setLoading(false)
+          return
+        }
+      } catch {
+        continue
+      }
+    }
+
+    setResults([])
+    setLoading(false)
   }
 
   async function doSearch(q: string) {
@@ -72,7 +104,7 @@ function SearchInner() {
     try {
       const res = await fetch(`/api/proxy?path=search&q=${encodeURIComponent(q)}`)
       const data = await res.json()
-      setResults(data.data || data.comics || data.results || [])
+      setResults(extractResults(data))
     } catch {
       setResults([])
     } finally {
@@ -82,7 +114,6 @@ function SearchInner() {
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    setGenre("")
     setGenreName("")
     doSearch(query)
   }, [query])
@@ -122,6 +153,10 @@ function SearchInner() {
           </button>
         </form>
 
+        {loading && (
+          <p className="text-center text-muted py-10 font-mono">Loading...</p>
+        )}
+
         {searched && !loading && results.length === 0 && (
           <p className="text-center text-muted py-10 font-mono">
             {genreName
@@ -142,8 +177,13 @@ function SearchInner() {
                   className="group block"
                 >
                   <div className="aspect-[3/4] overflow-hidden">
+                    {isPlaceholder(item.thumbnail || item.image) ? (
+                      <span className="flex items-center justify-center w-full h-full text-4xl font-black text-muted bg-surface/50">
+                        {item.title.charAt(0)}
+                      </span>
+                    ) : (
                     <img
-                      src={item.thumbnail}
+                      src={item.thumbnail || item.image}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       loading="lazy"
@@ -158,13 +198,14 @@ function SearchInner() {
                         }
                       }}
                     />
+                    )}
                   </div>
                   <div className="p-3">
                     <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
                       {item.title}
                     </h3>
-                    {item.type && (
-                      <p className="text-xs text-brand mt-1 font-mono">{item.type}</p>
+                    {(item.type || item.latestChapter) && (
+                      <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter}</p>
                     )}
                   </div>
                 </Link>
