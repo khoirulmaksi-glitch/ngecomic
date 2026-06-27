@@ -3,6 +3,34 @@
 import { useEffect, useRef, useState } from 'react';
 import './PixelCard.css';
 
+// --- Shared single animation loop ---
+const registry = new Map();
+let running = false;
+
+function sharedTick() {
+  for (const [, paint] of registry) {
+    paint();
+  }
+  if (registry.size > 0) {
+    requestAnimationFrame(sharedTick);
+  } else {
+    running = false;
+  }
+}
+
+function registerPaint(id, paint) {
+  registry.set(id, paint);
+  if (!running) {
+    running = true;
+    requestAnimationFrame(sharedTick);
+  }
+}
+
+function unregisterPaint(id) {
+  registry.delete(id);
+}
+// -----------------------------------
+
 class Pixel {
   constructor(canvas, context, x, y, color, speed, delay) {
     this.width = canvas.width;
@@ -124,104 +152,110 @@ const VARIANTS = {
   }
 };
 
+let uid = 0;
+
 export default function PixelCard({ variant = 'default', gap = undefined, speed = undefined, colors = undefined, noFocus = undefined, className = '', children }) {
-  const containerRef = useRef(null);
+  const id = useRef(++uid);
+  const cardRef = useRef(null);
   const canvasRef = useRef(null);
   const pixelsRef = useRef([]);
-  const animationRef = useRef(null);
-  const timePreviousRef = useRef(performance.now());
-  const reducedMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+  const [visible, setVisible] = useState(false);
   const [active, setActive] = useState(false);
 
   const variantCfg = VARIANTS[variant] || VARIANTS.default;
-  const finalGap = gap ?? variantCfg.gap;
-  const finalSpeed = speed ?? variantCfg.speed;
-  const finalColors = colors ?? variantCfg.colors;
   const finalNoFocus = noFocus ?? variantCfg.noFocus;
 
-  const initPixels = () => {
-    if (!containerRef.current || !canvasRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+  // IntersectionObserver: only allow canvas for cards near viewport
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { rootMargin: "100px" }
+    );
+    obs.observe(el);
+    return () => {
+      obs.disconnect();
+      unregisterPaint(id.current);
+      pixelsRef.current = [];
+    };
+  }, []);
+
+  // Canvas lifecycle: create + register on hover+visible, dispose on leave
+  useEffect(() => {
+    if (!active || !visible) {
+      unregisterPaint(id.current);
+      pixelsRef.current = [];
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const container = cardRef.current;
+    if (!canvas || !container) return;
+
+    const rect = container.getBoundingClientRect();
     const width = Math.floor(rect.width);
     const height = Math.floor(rect.height);
-    const ctx = canvasRef.current.getContext('2d');
-    canvasRef.current.width = width;
-    canvasRef.current.height = height;
-    const colorsArray = finalColors.split(',');
+    if (width === 0 || height === 0) return;
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const finalGap = gap ?? variantCfg.gap;
+    const finalSpeed = speed ?? variantCfg.speed;
+    const finalColors = colors ?? variantCfg.colors;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const colorArr = finalColors.split(',');
     const pxs = [];
     for (let x = 0; x < width; x += parseInt(finalGap, 10)) {
       for (let y = 0; y < height; y += parseInt(finalGap, 10)) {
-        const color = colorsArray[Math.floor(Math.random() * colorsArray.length)];
+        const c = colorArr[Math.floor(Math.random() * colorArr.length)];
         const dx = x - width / 2;
         const dy = y - height / 2;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const delay = reducedMotion ? 0 : distance;
-        pxs.push(new Pixel(canvasRef.current, ctx, x, y, color, getEffectiveSpeed(finalSpeed, reducedMotion), delay));
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        pxs.push(new Pixel(canvas, ctx, x, y, c, getEffectiveSpeed(finalSpeed, reducedMotion), reducedMotion ? 0 : dist));
       }
     }
     pixelsRef.current = pxs;
-  };
 
-  const doAnimate = fnName => {
-    animationRef.current = requestAnimationFrame(() => doAnimate(fnName));
-    const timeNow = performance.now();
-    const timePassed = timeNow - timePreviousRef.current;
-    const timeInterval = 1000 / 60;
-    if (timePassed < timeInterval) return;
-    timePreviousRef.current = timeNow - (timePassed % timeInterval);
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx || !canvasRef.current) return;
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    let allIdle = true;
-    for (let i = 0; i < pixelsRef.current.length; i++) {
-      const pixel = pixelsRef.current[i];
-      pixel[fnName]();
-      if (!pixel.isIdle) allIdle = false;
-    }
-    if (allIdle) cancelAnimationFrame(animationRef.current);
-  };
+    let idle = false;
+    registerPaint(id.current, () => {
+      if (idle) return;
+      ctx.clearRect(0, 0, width, height);
+      let allIdle = true;
+      for (const px of pxs) {
+        px.appear();
+        if (!px.isIdle) allIdle = false;
+      }
+      idle = allIdle;
+      if (idle) unregisterPaint(id.current);
+    });
 
-  const handleAnimation = name => {
-    cancelAnimationFrame(animationRef.current);
-    animationRef.current = requestAnimationFrame(() => doAnimate(name));
-  };
+    return () => {
+      unregisterPaint(id.current);
+      pixelsRef.current = [];
+    };
+  }, [active, visible, variant, gap, speed, colors]);
 
-  useEffect(() => {
-    if (!active) return;
-    initPixels();
-    handleAnimation('appear');
-  }, [active]);
-
-  const onMouseEnter = () => {
-    if (!active) setActive(true);
-    else handleAnimation('appear');
-  };
-  const onMouseLeave = () => handleAnimation('disappear');
-  const onFocus = e => {
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    if (!active) setActive(true);
-    else handleAnimation('appear');
-  };
-  const onBlur = e => {
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    handleAnimation('disappear');
-  };
-
-  useEffect(() => {
-    return () => cancelAnimationFrame(animationRef.current);
-  }, []);
+  const showCanvas = active && visible;
 
   return (
     <div
-      ref={containerRef}
+      ref={cardRef}
       className={`pixel-card ${className}`}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onFocus={finalNoFocus ? undefined : onFocus}
-      onBlur={finalNoFocus ? undefined : onBlur}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onFocus={finalNoFocus ? undefined : (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setActive(true);
+      }}
+      onBlur={finalNoFocus ? undefined : (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setActive(false);
+      }}
       tabIndex={finalNoFocus ? -1 : 0}
     >
-      {active && <canvas className="pixel-canvas" ref={canvasRef} />}
+      {showCanvas && <canvas className="pixel-canvas" ref={canvasRef} />}
       {children}
     </div>
   );
