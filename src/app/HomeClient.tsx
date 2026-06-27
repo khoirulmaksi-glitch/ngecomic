@@ -13,7 +13,6 @@ import ContinueReading from "@/components/ContinueReading"
 const GENRES = [
   { label: "For You", key: "for-you" },
   { label: "Romance", key: "romance" },
-  { label: "BL/GL", key: "bl-gl" },
   { label: "Action", key: "action" },
   { label: "Featured", key: "featured" },
 ]
@@ -32,7 +31,6 @@ const SECTIONS: SectionDef[] = [
   { title: "New Arrivals for You", subtitle: "Fresh updates", dataKey: "updates", slice: [0, 8] },
   { title: "Fall for You Now!", subtitle: "Romance picks", dataKey: "trending", slice: [4, 12] },
   { title: "Hotblood Adventure", subtitle: "Action packed", dataKey: "ongoing", slice: [4, 12] },
-  { title: "BL/GL - Pride of US", subtitle: "Love is love", dataKey: "trending", slice: [8, 16] },
   { title: "Eastern Love Tales", subtitle: "Asian romance", dataKey: "ongoing", slice: [8, 16] },
   { title: "Specially For You", subtitle: "Recommended just for you", dataKey: "updates", slice: [4, 12] },
 ]
