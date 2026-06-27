@@ -5,62 +5,16 @@ import type { Comic } from "@/lib/types"
 import GenreSection from "./GenreSection"
 import GenreChips from "./GenreChips"
 
+interface GenreData {
+  slug: string
+  label: string
+  comics: Comic[]
+}
+
 interface GenreItem {
   label: string
   value: string
 }
-
-function extractResults(data: any): any[] {
-  if (!data) return []
-  if (Array.isArray(data)) return data
-  if (data.comics) return Array.isArray(data.comics) ? data.comics : []
-  if (data.seriesList) return Array.isArray(data.seriesList) ? data.seriesList : []
-  if (data.results) return Array.isArray(data.results) ? data.results : []
-  if (data.data) return Array.isArray(data.data) ? data.data : []
-  return []
-}
-
-function extractSlug(item: any): string {
-  if (item.slug) return item.slug
-  if (item.link) {
-    const m = item.link.match(/\/manga\/([^/]+)/)
-    if (m) return m[1]
-  }
-  return ""
-}
-
-function toComic(item: any): Comic | null {
-  const slug = extractSlug(item)
-  if (!slug) return null
-  return {
-    title: item.title,
-    slug,
-    image: item.thumbnail || item.image || "",
-    rating: item.rating || "",
-    type: item.type || "",
-    chapter: item.chapter || item.latestChapter || "",
-  }
-}
-
-async function fetchGenreComics(slug: string): Promise<Comic[]> {
-  const endpoints = [
-    `/api/proxy?path=genre/${encodeURIComponent(slug)}`,
-    `/api/proxy?path=komikstation/genre/${encodeURIComponent(slug)}`,
-  ]
-  const results = await Promise.allSettled(
-    endpoints.map(u => fetch(u).then(r => r.ok ? r.json() : Promise.reject()))
-  )
-  for (const r of results) {
-    if (r.status !== "fulfilled") continue
-    const items = extractResults(r.value)
-    if (items.length > 0) {
-      return items.map(toComic).filter(Boolean) as Comic[]
-    }
-  }
-  return []
-}
-
-type GroupedData = Map<string, { label: string; comics: Comic[] }>
 
 function Skeleton() {
   return (
@@ -92,7 +46,7 @@ function Skeleton() {
 
 export default function GenrePage() {
   const [search, setSearch] = useState("")
-  const [grouped, setGrouped] = useState<GroupedData>(new Map())
+  const [grouped, setGrouped] = useState<Map<string, { label: string; comics: Comic[] }>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const genreOrder = useRef<string[]>([])
@@ -102,32 +56,23 @@ export default function GenrePage() {
 
     async function loadAll() {
       try {
-        const genreRes = await fetch("/api/proxy?path=komikstation/genres")
-        const genreData = await genreRes.json()
-        const genres: GenreItem[] = genreData.genres || []
+        const res = await fetch("/api/genre-data")
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (cancelled) return
 
-        if (cancelled || genres.length === 0) {
-          if (!cancelled) setLoading(false)
+        const genres: GenreData[] = json.genres || []
+        if (genres.length === 0) {
+          setLoading(false)
           return
         }
 
-        const allFetches = genres.map(async (g) => {
-          const slug = g.label.toLowerCase()
-          const comics = await fetchGenreComics(slug)
-          return { slug, label: g.label, comics }
-        })
-
-        const results = await Promise.allSettled(allFetches)
-        if (cancelled) return
-
-        const map: GroupedData = new Map()
+        const map = new Map<string, { label: string; comics: Comic[] }>()
         const order: string[] = []
 
-        for (const r of results) {
-          if (r.status === "fulfilled" && r.value.comics.length > 0) {
-            map.set(r.value.slug, { label: r.value.label, comics: r.value.comics })
-            order.push(r.value.slug)
-          }
+        for (const g of genres) {
+          map.set(g.slug, { label: g.label, comics: g.comics })
+          order.push(g.slug)
         }
 
         genreOrder.current = order
@@ -230,12 +175,8 @@ export default function GenrePage() {
           if (!entry || entry.comics.length === 0) return null
           const hide = q && !entry.label.toLowerCase().includes(q)
           return (
-            <div key={slug} className={hide ? 'hidden' : ''}>
-              <GenreSection
-                genreSlug={slug}
-                genreLabel={entry.label}
-                comics={entry.comics}
-              />
+            <div key={slug} className={hide ? "hidden" : ""}>
+              <GenreSection genreSlug={slug} genreLabel={entry.label} comics={entry.comics} />
             </div>
           )
         })}
