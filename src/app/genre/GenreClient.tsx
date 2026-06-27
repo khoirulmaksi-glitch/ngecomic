@@ -9,12 +9,6 @@ interface GenreItem {
   value: string
 }
 
-interface Props {
-  genres: GenreItem[]
-  initialSelected: string
-  initialComics: Comic[]
-}
-
 function extractResults(data: any): any[] {
   if (!data) return []
   if (Array.isArray(data)) return data
@@ -65,17 +59,49 @@ async function fetchGenre(slug: string): Promise<Comic[]> {
   return []
 }
 
-export default function GenreClient({ genres, initialSelected, initialComics }: Props) {
+export default function GenreClient() {
+  const [genres, setGenres] = useState<GenreItem[]>([])
+  const [selected, setSelected] = useState("")
+  const [comics, setComics] = useState<Comic[]>([])
+  const [ready, setReady] = useState(false)
   const cacheRef = useRef<Map<string, Comic[]>>(new Map())
   const prefetchedRef = useRef(false)
+  const initRef = useRef(false)
 
-  if (initialComics.length > 0) {
-    cacheRef.current.set(initialSelected, initialComics)
-  }
+  useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
 
-  const [selected, setSelected] = useState(initialSelected)
-  const [comics, setComics] = useState<Comic[]>(initialComics)
-  const [fetching, setFetching] = useState(false)
+    fetch("/api/proxy?path=komikstation/genres")
+      .then(r => r.json())
+      .then(data => {
+        const list: GenreItem[] = data.genres || []
+        setGenres(list)
+        if (list.length > 0) {
+          const first = list[0].label.toLowerCase()
+          setSelected(first)
+          fetchGenre(first).then(data => {
+            cacheRef.current.set(first, data)
+            setComics(data)
+            setReady(true)
+          })
+        } else {
+          setReady(true)
+        }
+      })
+      .catch(() => setReady(true))
+  }, [])
+
+  useEffect(() => {
+    if (prefetchedRef.current || genres.length === 0) return
+    prefetchedRef.current = true
+    genres.forEach(g => {
+      const s = g.label.toLowerCase()
+      if (!cacheRef.current.has(s) && s !== selected) {
+        fetchGenre(s).then(data => cacheRef.current.set(s, data))
+      }
+    })
+  }, [genres, selected])
 
   function doSelect(slug: string) {
     if (slug === selected) return
@@ -88,33 +114,34 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
       return
     }
 
-    setFetching(true)
     fetchGenre(slug).then(data => {
       cacheRef.current.set(slug, data)
       setComics(data)
-      setFetching(false)
     })
   }
 
-  async function prefetch(slug: string) {
+  function prefetch(slug: string) {
     if (cacheRef.current.has(slug)) return
-    const data = await fetchGenre(slug)
-    cacheRef.current.set(slug, data)
+    fetchGenre(slug).then(data => cacheRef.current.set(slug, data))
   }
-
-  useEffect(() => {
-    if (prefetchedRef.current || genres.length === 0) return
-    prefetchedRef.current = true
-    genres.forEach(g => {
-      const s = g.label.toLowerCase()
-      if (!cacheRef.current.has(s)) {
-        fetchGenre(s).then(data => cacheRef.current.set(s, data))
-      }
-    })
-  }, [genres])
 
   const selectedLabel = genres.find(g => g.label.toLowerCase() === selected)?.label || selected
-  const noData = !fetching && comics.length === 0
+
+  if (!ready) {
+    return (
+      <div className="bg-surface text-on-surface min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted font-mono text-sm">Loading...</div>
+      </div>
+    )
+  }
+
+  if (genres.length === 0) {
+    return (
+      <div className="bg-surface text-on-surface min-h-screen flex items-center justify-center">
+        <p className="text-muted font-mono text-sm">Gagal memuat genre</p>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col">
@@ -179,14 +206,14 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
             <p className="text-muted text-xs mt-0.5">Menampilkan komik genre {selectedLabel}</p>
           </div>
 
-          {noData && (
+          {comics.length === 0 && (
             <div className="text-center py-16">
               <p className="text-muted font-mono">Tidak ada komik untuk genre ini</p>
             </div>
           )}
 
           {comics.length > 0 && (
-            <div className={`min-h-[50vh] ${fetching ? "opacity-40" : "opacity-100"} transition-opacity duration-100`}>
+            <div className="min-h-[50vh]">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
                 {comics.map(comic => (
                   <ComicCard key={comic.slug} comic={comic} />
