@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import PixelCard from "@/components/PixelCard"
 
 interface SearchResult {
@@ -43,13 +42,29 @@ function extractResults(data: any): SearchResult[] {
   return []
 }
 
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5 animate-pulse">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className="border-2 border-outline bg-surface overflow-hidden">
+          <div className="aspect-[3/4] bg-zinc-800" />
+          <div className="p-3 space-y-2">
+            <div className="h-3 bg-zinc-800 rounded w-3/4" />
+            <div className="h-2 bg-zinc-800 rounded w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function SearchPage() {
-  const router = useRouter()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [searched, setSearched] = useState(false)
   const [genreName, setGenreName] = useState("")
+  const genreListRef = useRef<{ label: string; value: string }[] | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -60,27 +75,33 @@ export default function SearchPage() {
       doSearch(q)
     } else if (g) {
       fetchGenreComics(g)
+    } else {
+      setLoading(false)
     }
   }, [])
+
+  async function loadGenreList() {
+    if (genreListRef.current) return genreListRef.current
+    try {
+      const res = await fetch("/api/proxy?path=komikstation/genres")
+      if (res.ok) {
+        const data = await res.json()
+        genreListRef.current = data.genres || []
+        return genreListRef.current
+      }
+    } catch {}
+    return []
+  }
 
   async function fetchGenreComics(g: string) {
     setLoading(true)
     setSearched(true)
+    setResults([])
+    setGenreName("")
 
-    try {
-      const genreRes = await fetch("/api/proxy?path=komikstation/genres")
-      if (genreRes.ok) {
-        const genreData = await genreRes.json()
-        const genres: { label: string; value: string }[] = genreData.genres || []
-        const found = genres.find((x) => x.label.toLowerCase() === g)
-        if (found) setGenreName(found.label)
-        else setGenreName(g)
-      } else {
-        setGenreName(g)
-      }
-    } catch {
-      setGenreName(g)
-    }
+    const genres = (await loadGenreList()) || []
+    const found = genres.find((x) => x.label.toLowerCase() === g)
+    setGenreName(found?.label || g)
 
     const endpoints = [
       `/api/proxy?path=genre/${encodeURIComponent(g)}`,
@@ -103,7 +124,6 @@ export default function SearchPage() {
       }
     }
 
-    setResults([])
     setLoading(false)
   }
 
@@ -111,6 +131,8 @@ export default function SearchPage() {
     if (!q.trim()) return
     setLoading(true)
     setSearched(true)
+    setResults([])
+    setGenreName("")
     try {
       const res = await fetch(`/api/proxy?path=search&q=${encodeURIComponent(q)}`)
       const data = await res.json()
@@ -122,9 +144,14 @@ export default function SearchPage() {
     }
   }
 
+  function switchGenre(g: string) {
+    window.history.replaceState(null, "", `/search?genre=${g}`)
+    fetchGenreComics(g.toLowerCase())
+  }
+
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    setGenreName("")
+    window.history.replaceState(null, "", `/search?q=${encodeURIComponent(query)}`)
     doSearch(query)
   }, [query])
 
@@ -163,11 +190,9 @@ export default function SearchPage() {
           </button>
         </form>
 
-        {loading && (
-          <p className="text-center text-muted py-10 font-mono">Loading...</p>
-        )}
+        {loading && <SkeletonGrid />}
 
-        {searched && !loading && results.length === 0 && (
+        {!loading && searched && results.length === 0 && (
           <p className="text-center text-muted py-10 font-mono">
             {genreName
               ? `Tidak ada komik untuk genre "${genreName}"`
@@ -176,64 +201,68 @@ export default function SearchPage() {
           </p>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
-          {results.map((item, idx) => {
-            const slug = extractSlug(item)
-            if (!slug) return null
-            return (
-              <PixelCard key={slug || idx} variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
-                <Link
-                  href={`/comic/${slug}`}
-                  className="group block"
-                >
-                  <div className="aspect-[3/4] overflow-hidden">
-                    {isPlaceholder(item.thumbnail || item.image) ? (
-                      <span className="flex items-center justify-center w-full h-full text-4xl font-black text-muted bg-surface/50">
-                        {item.title.charAt(0)}
-                      </span>
-                    ) : (
-                    <img
-                      src={item.thumbnail || item.image}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none"
-                        const p = (e.target as HTMLElement).parentElement
-                        if (p && !p.querySelector(".fl")) {
-                          const s = document.createElement("span")
-                          s.className = "fl absolute inset-0 flex items-center justify-center text-3xl font-black text-muted"
-                          s.textContent = item.title.charAt(0)
-                          p.appendChild(s)
-                        }
-                      }}
-                    />
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
-                      {item.title}
-                    </h3>
-                    {item.genre && (
-                      <span
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          router.push(`/search?genre=${item.genre.toLowerCase()}`)
-                        }}
-                        className="inline-block mt-1.5 px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
-                      >
-                        {item.genre}
-                      </span>
-                    )}
-                    {(item.type || item.latestChapter || item.chapter) && (
-                      <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter || item.chapter}</p>
-                    )}
-                  </div>
-                </Link>
-              </PixelCard>
-            )
-          })}
+        <div className={`transition-opacity duration-300 ${loading ? "opacity-0" : "opacity-100"}`}>
+          {results.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+              {results.map((item, idx) => {
+                const slug = extractSlug(item)
+                if (!slug) return null
+                return (
+                  <PixelCard key={slug || idx} variant="pink" className="border-2 border-outline hover:border-brand bg-surface">
+                    <Link
+                      href={`/comic/${slug}`}
+                      className="group block"
+                    >
+                      <div className="aspect-[3/4] overflow-hidden">
+                        {isPlaceholder(item.thumbnail || item.image) ? (
+                          <span className="flex items-center justify-center w-full h-full text-4xl font-black text-muted bg-surface/50">
+                            {item.title.charAt(0)}
+                          </span>
+                        ) : (
+                        <img
+                          src={item.thumbnail || item.image}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none"
+                            const p = (e.target as HTMLElement).parentElement
+                            if (p && !p.querySelector(".fl")) {
+                              const s = document.createElement("span")
+                              s.className = "fl absolute inset-0 flex items-center justify-center text-3xl font-black text-muted"
+                              s.textContent = item.title.charAt(0)
+                              p.appendChild(s)
+                            }
+                          }}
+                        />
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-bold text-sm line-clamp-2 text-on-surface">
+                          {item.title}
+                        </h3>
+                        {item.genre && (
+                          <span
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              switchGenre(item.genre)
+                            }}
+                            className="inline-block mt-1.5 px-1.5 py-0.5 bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-wider cursor-pointer hover:bg-brand/20 transition-colors"
+                          >
+                            {item.genre}
+                          </span>
+                        )}
+                        {(item.type || item.latestChapter || item.chapter) && (
+                          <p className="text-xs text-brand mt-1 font-mono">{item.type || item.latestChapter || item.chapter}</p>
+                        )}
+                      </div>
+                    </Link>
+                  </PixelCard>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
