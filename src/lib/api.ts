@@ -1,41 +1,68 @@
 const BASE = process.env.API_BASE_URL || "https://www.sankavollerei.web.id"
 
+const PROXY_SERVICES = [
+  "https://api.allorigins.win/raw?url=",
+  "https://corsproxy.io/?url=",
+]
+
 type FetcherOptions = {
   cache?: RequestInit["cache"]
   next?: { revalidate?: number; tags?: string[] }
 }
 
-const TIMEOUT_MS = 15000
+const TIMEOUT_MS = 10000
 const MAX_RETRIES = 2
 
 async function fetchFromAPI<T>(path: string, options?: FetcherOptions): Promise<T> {
-  const url = `${BASE}/comic${path}`
+  const targetUrl = `${BASE}/comic${path}`
+  const errors: string[] = []
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  // Build URLs to try: direct first, then proxy services
+  const urls = [targetUrl, ...PROXY_SERVICES.map(s => `${s}${encodeURIComponent(targetUrl)}`)]
 
-    try {
-      const fetchOptions: RequestInit & { next?: { revalidate?: number; tags?: string[] } } = {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-        signal: controller.signal,
+  for (let i = 0; i < urls.length; i++) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+      try {
+        const fetchOptions: RequestInit & { next?: { revalidate?: number; tags?: string[] } } = {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          },
+          signal: controller.signal,
+        }
+
+        // Only apply Next.js cache options on direct URL (proxies don't support it)
+        if (i === 0) {
+          if (options?.next) {
+            fetchOptions.next = options.next
+          } else {
+            fetchOptions.cache = options?.cache || "no-store"
+          }
+        }
+
+        const res = await fetch(urls[i], fetchOptions)
+        clearTimeout(timeout)
+        if (!res.ok) {
+          errors.push(`URL ${i} attempt ${attempt}: ${res.status}`)
+          throw new Error(`API error: ${res.status}`)
+        }
+        return res.json() as Promise<T>
+      } catch (e) {
+        clearTimeout(timeout)
+        if (i === urls.length - 1 && attempt === MAX_RETRIES) {
+          errors.push(`Final: ${e instanceof Error ? e.message : "unknown"}`)
+        }
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 1000))
+        }
       }
-      if (options?.next) {
-        fetchOptions.next = options.next
-      } else {
-        fetchOptions.cache = options?.cache || "no-store"
-      }
-      const res = await fetch(url, fetchOptions)
-      if (!res.ok) throw new Error(`API error: ${res.status}`)
-      return res.json()
-    } catch (e) {
-      clearTimeout(timeout)
-      if (attempt === MAX_RETRIES) throw e
-      await new Promise(r => setTimeout(r, attempt * 1000))
     }
   }
 
-  throw new Error("unreachable")
+  throw new Error(`All fetch attempts failed: ${errors.join("; ")}`)
 }
 
 export interface HomeComicItem {

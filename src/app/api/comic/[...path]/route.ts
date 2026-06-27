@@ -3,6 +3,11 @@ import { query } from "@/lib/db"
 
 const BASE = process.env.API_BASE_URL || "https://www.sankavollerei.web.id"
 
+const PROXY_SERVICES = [
+  "https://api.allorigins.win/raw?url=",
+  "https://corsproxy.io/?url=",
+]
+
 async function logApi(endpoint: string, method: string, statusCode: number, durationMs: number, userId: number | null, ip: string) {
   try {
     await query(
@@ -22,35 +27,42 @@ export async function GET(
   const start = Date.now()
   const pathStr = path.join("/")
   const search = request.nextUrl.search
-  const url = `${BASE}/comic/${pathStr}${search}`
+  const targetUrl = `${BASE}/comic/${pathStr}${search}`
 
-  const TIMEOUT = 15000
-  const MAX_RETRIES = 2
+  const errors: string[] = []
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT)
+  // Try in order: direct -> proxy1 -> proxy2
+  const urls = [targetUrl, ...PROXY_SERVICES.map(s => `${s}${encodeURIComponent(targetUrl)}`)]
 
+  for (let i = 0; i < urls.length; i++) {
     try {
-      const response = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(urls[i], {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        },
         signal: controller.signal,
       })
       clearTimeout(timeout)
+
+      if (!response.ok) {
+        errors.push(`URL ${i}: ${response.status}`)
+        continue
+      }
+
       const data = await response.json()
       const duration = Date.now() - start
 
       void logApi(`/comic/${pathStr}`, "GET", response.status, duration, null, request.headers.get("x-forwarded-for") || "unknown")
 
       return NextResponse.json(data)
-    } catch {
-      clearTimeout(timeout)
-      if (attempt === MAX_RETRIES) {
-        return NextResponse.json({ error: "Failed to fetch comic data" }, { status: 500 })
-      }
-      await new Promise(r => setTimeout(r, attempt * 1000))
+    } catch (e) {
+      errors.push(`URL ${i}: ${e instanceof Error ? e.message : "unknown"}`)
     }
   }
 
-  return NextResponse.json({ error: "Failed to fetch comic data" }, { status: 500 })
+  return NextResponse.json({ error: "Failed to fetch comic data", details: errors }, { status: 502 })
 }
