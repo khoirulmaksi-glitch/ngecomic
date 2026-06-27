@@ -147,9 +147,9 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
 
       {/* Chapter images - login wall if not authenticated */}
       {chapter.images && chapter.images.length > 0 && (
-        <div className="space-y-4 relative">
-          <div className={`${!session?.user ? "blur-sm select-none" : ""}`}>
-            {chapter.images.map((img, i) => (
+        <div className="space-y-4 relative min-h-[60vh]">
+          {session?.user ? (
+            chapter.images.map((img, i) => (
               <img
                 key={i}
                 src={proxyImage(img)}
@@ -157,11 +157,9 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
                 className="w-full border-2 border-outline"
                 loading="lazy"
               />
-            ))}
-          </div>
-
-          {!session?.user && (
-            <div className="absolute inset-0 flex items-center justify-center bg-surface/40">
+            ))
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-surface border border-outline rounded-2xl shadow-2xl p-8 max-w-sm mx-4 text-center">
                 <div className="w-14 h-14 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand">
@@ -171,7 +169,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
                 </div>
                 <h3 className="text-lg font-bold text-on-surface mb-2">Login to Read</h3>
                 <p className="text-sm text-muted mb-6">
-                  Kamu harus login dulu untuk membaca chapter ini. Klik tombol di bawah untuk masuk.
+                  Kamu harus login dulu untuk membaca chapter ini.
                 </p>
                 <Link
                   href="/login"
