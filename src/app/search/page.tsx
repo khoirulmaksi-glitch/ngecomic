@@ -17,20 +17,53 @@ interface SearchResult {
   description: string
 }
 
+interface GenreInfo {
+  label: string
+  value: string
+}
+
 function SearchInner() {
   const searchParams = useSearchParams()
   const [query, setQuery] = useState(searchParams.get("q") || "")
+  const [genre, setGenre] = useState(searchParams.get("genre") || "")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [genreName, setGenreName] = useState("")
 
   useEffect(() => {
     const q = searchParams.get("q")
+    const g = searchParams.get("genre")
     if (q) {
       setQuery(q)
+      setGenre("")
       doSearch(q)
+    } else if (g) {
+      setGenre(g)
+      setQuery("")
+      fetchGenreComics(g)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function fetchGenreComics(g: string) {
+    setLoading(true)
+    setSearched(true)
+    try {
+      const genreRes = await fetch("/api/proxy?path=komikstation/genres")
+      const genreData = await genreRes.json()
+      const genres: GenreInfo[] = genreData.genres || []
+      const found = genres.find((x) => x.value === g)
+      setGenreName(found?.label || g)
+
+      const res = await fetch(`/api/proxy?path=komikstation/genre/${g}`)
+      const data = await res.json()
+      setResults(data.data || data.comics || data.results || [])
+    } catch {
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function doSearch(q: string) {
     if (!q.trim()) return
@@ -49,6 +82,8 @@ function SearchInner() {
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
+    setGenre("")
+    setGenreName("")
     doSearch(query)
   }, [query])
 
@@ -62,8 +97,12 @@ function SearchInner() {
     <div className="bg-surface text-on-surface min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold">Search</h1>
-          <p className="text-muted text-sm mt-1">Find your favorite comics</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">
+            {genreName ? `Genre: ${genreName}` : "Search"}
+          </h1>
+          <p className="text-muted text-sm mt-1">
+            {genreName ? `Menampilkan komik genre ${genreName}` : "Find your favorite comics"}
+          </p>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-3 mb-8 max-w-2xl">
@@ -85,7 +124,10 @@ function SearchInner() {
 
         {searched && !loading && results.length === 0 && (
           <p className="text-center text-muted py-10 font-mono">
-            Tidak ada hasil untuk &quot;{query}&quot;
+            {genreName
+              ? `Tidak ada komik untuk genre "${genreName}"`
+              : `Tidak ada hasil untuk "${query}"`
+            }
           </p>
         )}
 

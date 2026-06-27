@@ -121,12 +121,13 @@ export default function ComicDetailClient({ comic, slug }: Props) {
           {comic.genres && comic.genres.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
               {comic.genres.map((g) => (
-                <span
+                <Link
                   key={g.slug}
-                  className="px-2.5 py-1 bg-zinc-800 text-neon-cyan text-xs font-mono border border-zinc-700"
+                  href={`/search?genre=${g.slug}`}
+                  className="px-2.5 py-1 bg-zinc-800 text-neon-cyan text-xs font-mono border border-zinc-700 hover:bg-zinc-700 hover:text-white transition-colors"
                 >
                   {g.name}
-                </span>
+                </Link>
               ))}
             </div>
           )}
