@@ -1,5 +1,7 @@
 import GenreClient from "./GenreClient"
 
+export const dynamic = 'force-dynamic'
+
 const API_BASE_URL = process.env.API_BASE_URL || "https://www.sankavollerei.web.id"
 
 interface GenreItem {
@@ -9,10 +11,7 @@ interface GenreItem {
 
 async function fetchJSON(url: string) {
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      next: { revalidate: 60 },
-    })
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })
     if (!res.ok) return null
     return res.json()
   } catch {
@@ -49,14 +48,14 @@ export default async function GenrePage() {
   if (genres.length > 0) {
     initialSelected = genres[0].label.toLowerCase()
 
-    const endpoints = [
-      `${API_BASE_URL}/comic/genre/${encodeURIComponent(initialSelected)}`,
-      `${API_BASE_URL}/comic/komikstation/genre/${encodeURIComponent(initialSelected)}`,
-    ]
+    const [a, b] = await Promise.allSettled([
+      fetchJSON(`${API_BASE_URL}/comic/genre/${encodeURIComponent(initialSelected)}`),
+      fetchJSON(`${API_BASE_URL}/comic/komikstation/genre/${encodeURIComponent(initialSelected)}`),
+    ])
 
-    for (const url of endpoints) {
-      const data = await fetchJSON(url)
-      const items = extractResults(data)
+    for (const result of [a, b]) {
+      if (result.status !== "fulfilled" || !result.value) continue
+      const items = extractResults(result.value)
       if (items.length > 0) {
         initialComics = items.map(item => {
           const slug = extractSlug(item)

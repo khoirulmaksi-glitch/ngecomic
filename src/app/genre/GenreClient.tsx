@@ -47,9 +47,26 @@ function mapItem(item: any): Comic | null {
   }
 }
 
+async function fetchGenre(slug: string): Promise<Comic[]> {
+  const endpoints = [
+    `/api/proxy?path=genre/${encodeURIComponent(slug)}`,
+    `/api/proxy?path=komikstation/genre/${encodeURIComponent(slug)}`,
+  ]
+  const results = await Promise.allSettled(
+    endpoints.map(url => fetch(url).then(r => r.ok ? r.json() : Promise.reject()))
+  )
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue
+    const items = extractResults(r.value)
+    if (items.length > 0) {
+      return items.map(mapItem).filter(Boolean) as Comic[]
+    }
+  }
+  return []
+}
+
 export default function GenreClient({ genres, initialSelected, initialComics }: Props) {
   const cacheRef = useRef<Map<string, Comic[]>>(new Map())
-  const fetchReqRef = useRef<AbortController | null>(null)
   const prefetchedRef = useRef(false)
 
   if (initialComics.length > 0) {
@@ -58,49 +75,24 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
 
   const [selected, setSelected] = useState(initialSelected)
   const [comics, setComics] = useState<Comic[]>(initialComics)
-  const [loading, setLoading] = useState(false)
-
-  async function fetchGenre(slug: string): Promise<Comic[]> {
-    const endpoints = [
-      `/api/proxy?path=genre/${encodeURIComponent(slug)}`,
-      `/api/proxy?path=komikstation/genre/${encodeURIComponent(slug)}`,
-    ]
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url)
-        if (!res.ok) continue
-        const data = await res.json()
-        const items = extractResults(data)
-        if (items.length > 0) {
-          return items.map(mapItem).filter(Boolean) as Comic[]
-        }
-      } catch {}
-    }
-    return []
-  }
+  const [fetching, setFetching] = useState(false)
 
   function doSelect(slug: string) {
     if (slug === selected) return
-    fetchReqRef.current?.abort()
     setSelected(slug)
     window.history.replaceState(null, "", `/genre?g=${slug}`)
 
     const cached = cacheRef.current.get(slug)
     if (cached) {
       setComics(cached)
-      setLoading(false)
       return
     }
 
-    setLoading(true)
-    const controller = new AbortController()
-    fetchReqRef.current = controller
-
+    setFetching(true)
     fetchGenre(slug).then(data => {
-      if (controller.signal.aborted) return
       cacheRef.current.set(slug, data)
       setComics(data)
-      setLoading(false)
+      setFetching(false)
     })
   }
 
@@ -115,14 +107,14 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
     prefetchedRef.current = true
     genres.forEach(g => {
       const s = g.label.toLowerCase()
-      if (!cacheRef.current.has(s) && s !== selected) {
+      if (!cacheRef.current.has(s)) {
         fetchGenre(s).then(data => cacheRef.current.set(s, data))
       }
     })
-  }, [genres, selected])
+  }, [genres])
 
   const selectedLabel = genres.find(g => g.label.toLowerCase() === selected)?.label || selected
-  const showSkeleton = loading && cacheRef.current.get(selected) === undefined
+  const noData = !fetching && comics.length === 0
 
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col">
@@ -187,28 +179,14 @@ export default function GenreClient({ genres, initialSelected, initialComics }: 
             <p className="text-muted text-xs mt-0.5">Menampilkan komik genre {selectedLabel}</p>
           </div>
 
-          {showSkeleton && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 animate-pulse">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="border-2 border-outline bg-surface overflow-hidden">
-                  <div className="aspect-[3/4] bg-zinc-800" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-3 bg-zinc-800 rounded w-3/4" />
-                    <div className="h-2 bg-zinc-800 rounded w-1/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!showSkeleton && comics.length === 0 && (
+          {noData && (
             <div className="text-center py-16">
               <p className="text-muted font-mono">Tidak ada komik untuk genre ini</p>
             </div>
           )}
 
           {comics.length > 0 && (
-            <div className={`transition-opacity duration-150 ${loading ? "opacity-40" : "opacity-100"}`}>
+            <div className={`min-h-[50vh] ${fetching ? "opacity-40" : "opacity-100"} transition-opacity duration-100`}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
                 {comics.map(comic => (
                   <ComicCard key={comic.slug} comic={comic} />
