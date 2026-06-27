@@ -77,12 +77,12 @@ function GenreTab({ label, active, onClick }: { label: string; active: boolean; 
     <button
       onClick={onClick}
       className={`relative px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
-        active ? "text-[#303133]" : "text-[#c0c4cc] hover:text-[#606266]"
+        active ? "text-on-surface" : "text-muted hover:text-on-surface"
       }`}
     >
       {label}
       {active && (
-        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-[#07beb8] rounded-full" />
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-brand rounded-full" />
       )}
     </button>
   )
@@ -108,28 +108,25 @@ function ComicCard({ item, imageMap, rank, index }: ComicCardProps) {
 
   return (
     <Link href={`/comic/${slug}`} className="group block">
-      <div className="relative overflow-hidden rounded-2xl bg-[#f5f5f5] aspect-[3/4] shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl bg-card-surface aspect-[3/4] shadow-sm">
         <ComicImage
           src={img}
           alt={title}
           className="w-full h-full group-hover:scale-105 transition-transform duration-500"
         />
 
-        {/* Rank badge */}
         {rank !== undefined && (
-          <div className="absolute top-2 left-2 bg-[#07beb8] text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
+          <div className="absolute top-2 left-2 bg-brand text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
             #{rank}
           </div>
         )}
 
-        {/* New badge */}
         {isNew && rank === undefined && (
-          <div className="absolute top-2 left-2 bg-[#ff6b6b] text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
+          <div className="absolute top-2 left-2 bg-danger text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
             New
           </div>
         )}
 
-        {/* Chapter overlay */}
         {chapter && rank === undefined && !isNew && (
           <div className="absolute bottom-2 left-2 right-2">
             <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded inline-block truncate max-w-full">
@@ -140,11 +137,11 @@ function ComicCard({ item, imageMap, rank, index }: ComicCardProps) {
       </div>
 
       <div className="mt-2 px-0.5">
-        <h3 className="text-sm font-medium text-[#303133] line-clamp-2 leading-tight group-hover:text-[#07beb8] transition-colors">
+        <h3 className="text-sm font-medium text-on-surface line-clamp-2 leading-tight group-hover:text-brand transition-colors">
           {title}
         </h3>
         {chapter && (
-          <p className="text-xs text-[#9fa2a8] mt-0.5 truncate">
+          <p className="text-xs text-muted mt-0.5 truncate">
             {chapter}
           </p>
         )}
@@ -173,12 +170,12 @@ function ComicSection({ title, subtitle, items, imageMap, numbered }: SectionPro
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-[#303133]">{title}</h2>
-            <p className="text-sm text-[#9fa2a8] mt-0.5">{subtitle}</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-on-surface">{title}</h2>
+            <p className="text-sm text-muted mt-0.5">{subtitle}</p>
           </div>
           <Link
             href="/populer"
-            className="text-sm font-medium text-[#07beb8] hover:text-[#059b96] transition-colors shrink-0"
+            className="text-sm font-medium text-brand hover:text-brand transition-colors shrink-0"
           >
             Read More &rarr;
           </Link>
@@ -201,7 +198,7 @@ function ComicSection({ title, subtitle, items, imageMap, numbered }: SectionPro
 }
 
 // ============================================================
-// Banner Carousel (WebComics card-style)
+// Banner Carousel
 // ============================================================
 
 function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLatestUpdate)[]; imageMap: Record<string, string> }) {
@@ -223,13 +220,10 @@ function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLates
 
   if (length === 0) return null
 
-  const activeItem = items[current]
-
   return (
-    <section className="bg-white pt-6 sm:pt-8 pb-6">
+    <section className="bg-surface pt-6 sm:pt-8 pb-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="relative">
-          {/* Viewport with card peek */}
           <div className="overflow-hidden rounded-3xl">
             <div
               className="flex transition-transform duration-500 ease-out"
@@ -256,7 +250,7 @@ function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLates
                         {title}
                       </h2>
                       <div className="flex gap-2 mt-3">
-                        <span className="bg-[#07beb8] text-white text-xs font-semibold px-3 py-1 rounded-full">
+                        <span className="bg-brand text-white text-xs font-semibold px-3 py-1 rounded-full">
                           POPULAR
                         </span>
                         {"rating" in item && item.rating && (
@@ -272,10 +266,9 @@ function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLates
             </div>
           </div>
 
-          {/* Arrows */}
           <button
             onClick={prev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white shadow-lg rounded-full flex items-center justify-center text-[#303133] hover:text-[#07beb8] transition-all z-10"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface/90 hover:bg-surface shadow-lg rounded-full flex items-center justify-center text-on-surface hover:text-brand transition-all z-10"
             aria-label="Previous"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -284,7 +277,7 @@ function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLates
           </button>
           <button
             onClick={next}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white shadow-lg rounded-full flex items-center justify-center text-[#303133] hover:text-[#07beb8] transition-all z-10"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-surface/90 hover:bg-surface shadow-lg rounded-full flex items-center justify-center text-on-surface hover:text-brand transition-all z-10"
             aria-label="Next"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -292,14 +285,13 @@ function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLates
             </svg>
           </button>
 
-          {/* Dots */}
           <div className="flex justify-center gap-2 mt-4">
             {items.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrent(i)}
                 className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                  i === current ? "bg-[#07beb8] w-6" : "bg-[#e1e2e6] hover:bg-[#c0c4cc]"
+                  i === current ? "bg-brand w-6" : "bg-muted hover:bg-on-surface/30"
                 }`}
                 aria-label={`Go to slide ${i + 1}`}
               />
@@ -328,9 +320,9 @@ export default function HomeClient({ trending, updates, ongoing, imageMap }: Pro
   }
 
   return (
-    <div className="bg-white text-[#303133] min-h-screen">
+    <div className="bg-surface text-on-surface min-h-screen">
       {/* Sub-header genre tabs */}
-      <div className="bg-white/95 border-b border-[#e7e8ec]">
+      <div className="bg-surface/95 border-b border-outline">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center overflow-x-auto no-scrollbar">
             {GENRES.map((g, i) => (
@@ -341,7 +333,7 @@ export default function HomeClient({ trending, updates, ongoing, imageMap }: Pro
                   onClick={() => setActiveGenre(g.key)}
                 />
                 {i < GENRES.length - 1 && (
-                  <div className="w-px h-4 bg-[#e1e2e6] shrink-0" />
+                  <div className="w-px h-4 bg-muted/50 shrink-0" />
                 )}
               </Fragment>
             ))}
