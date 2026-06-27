@@ -121,6 +121,14 @@ body {
   z-index: 9999;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     --background: #0a0a0a;

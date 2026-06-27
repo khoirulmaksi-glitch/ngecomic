@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import PixelCard from "@/components/PixelCard"
 
 interface SearchResult {
   title: string
@@ -78,38 +79,39 @@ export default function SearchPage() {
           const slug = extractSlug(item)
           if (!slug) return null
           return (
-            <Link
-              key={item.slug || item.href}
-              href={`/comic/${slug}`}
-              className="group border-2 border-zinc-800 hover:border-neon-cyan transition-colors bg-brutal-black overflow-hidden"
-            >
-              <div className="aspect-[3/4] overflow-hidden">
-                <img
-                  src={item.thumbnail}
-                  alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none"
-                    const p = (e.target as HTMLElement).parentElement
-                    if (p && !p.querySelector(".fl")) {
-                      const s = document.createElement("span")
-                      s.className = "fl absolute inset-0 flex items-center justify-center text-3xl font-black text-zinc-700"
-                      s.textContent = item.title.charAt(0)
-                      p.appendChild(s)
-                    }
-                  }}
-                />
-              </div>
-              <div className="p-3">
-                <h3 className="font-bold text-sm line-clamp-2 text-brutal-white group-hover:text-neon-cyan transition-colors">
-                  {item.title}
-                </h3>
-                {item.type && (
-                  <p className="text-xs text-neon-pink mt-1 font-mono">{item.type}</p>
-                )}
-              </div>
-            </Link>
+            <PixelCard key={item.slug || item.href} variant="pink" className="border-2 border-zinc-800 hover:border-neon-cyan bg-brutal-black">
+              <Link
+                href={`/comic/${slug}`}
+                className="group block"
+              >
+                <div className="aspect-[3/4] overflow-hidden">
+                  <img
+                    src={item.thumbnail}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none"
+                      const p = (e.target as HTMLElement).parentElement
+                      if (p && !p.querySelector(".fl")) {
+                        const s = document.createElement("span")
+                        s.className = "fl absolute inset-0 flex items-center justify-center text-3xl font-black text-zinc-700"
+                        s.textContent = item.title.charAt(0)
+                        p.appendChild(s)
+                      }
+                    }}
+                  />
+                </div>
+                <div className="p-3">
+                  <h3 className="font-bold text-sm line-clamp-2 text-brutal-white">
+                    {item.title}
+                  </h3>
+                  {item.type && (
+                    <p className="text-xs text-neon-pink mt-1 font-mono">{item.type}</p>
+                  )}
+                </div>
+              </Link>
+            </PixelCard>
           )
         })}
       </div>

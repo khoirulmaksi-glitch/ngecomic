@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import ComicImage from "@/components/ComicImage"
+import PixelCard from "@/components/PixelCard"
 
 interface Favorite {
   id: number
@@ -67,28 +68,30 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {favorites.map((fav) => (
-            <div key={fav.id} className="group relative border-2 border-zinc-800 hover:border-neon-pink transition-colors bg-brutal-black overflow-hidden">
-              <Link href={`/comic/${fav.comic_slug}`}>
-                <div className="aspect-[3/4] overflow-hidden bg-brutal-gray">
-                  <ComicImage
-                    src={fav.comic_image}
-                    alt={fav.comic_title}
-                    className="w-full h-full group-hover:scale-105 transition duration-300"
-                  />
-                </div>
-                <div className="p-3">
-                  <h3 className="font-bold text-sm line-clamp-2 text-brutal-white group-hover:text-neon-pink transition-colors">
-                    {fav.comic_title}
-                  </h3>
-                </div>
-              </Link>
-              <button
-                onClick={() => removeFavorite(fav.comic_slug)}
-                className="absolute top-2 right-2 bg-brutal-red text-white w-7 h-7 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                X
-              </button>
-            </div>
+            <PixelCard key={fav.id} variant="pink" className="border-2 border-zinc-800 hover:border-neon-pink bg-brutal-black">
+              <div className="relative">
+                <Link href={`/comic/${fav.comic_slug}`} className="group block">
+                  <div className="aspect-[3/4] overflow-hidden bg-brutal-gray">
+                    <ComicImage
+                      src={fav.comic_image}
+                      alt={fav.comic_title}
+                      className="w-full h-full group-hover:scale-105 transition duration-300"
+                    />
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-bold text-sm line-clamp-2 text-brutal-white">
+                      {fav.comic_title}
+                    </h3>
+                  </div>
+                </Link>
+                <button
+                  onClick={() => removeFavorite(fav.comic_slug)}
+                  className="absolute top-2 right-2 bg-brutal-red text-white w-7 h-7 flex items-center justify-center text-xs font-bold"
+                >
+                  X
+                </button>
+              </div>
+            </PixelCard>
           ))}
         </div>
       )}

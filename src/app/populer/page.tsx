@@ -1,15 +1,36 @@
-import { getOngoing } from "@/lib/api"
+import { getOngoing, getComicDetail } from "@/lib/api"
 import ComicCard from "@/components/ComicCard"
 import type { Comic } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
 
+type ImageMap = Record<string, string>
+
 export default async function PopulerPage() {
   const data = await getOngoing(1)
-  const comics: Comic[] = (data.results || []).map((item) => ({
+  const items = data.results || []
+
+  const slugList: string[] = []
+  for (const i of items) {
+    if (i.imageSrc.startsWith("data:")) {
+      slugList.push(i.slug)
+    }
+  }
+
+  const imageMap: ImageMap = {}
+  if (slugList.length > 0) {
+    const results = await Promise.allSettled(slugList.map(s => getComicDetail(s)))
+    results.forEach((res, i) => {
+      if (res.status === "fulfilled" && !res.value.imageSrc.startsWith("data:")) {
+        imageMap[slugList[i]] = res.value.imageSrc
+      }
+    })
+  }
+
+  const comics: Comic[] = items.map((item) => ({
     title: item.title,
     slug: item.slug,
-    image: item.imageSrc,
+    image: imageMap[item.slug] || item.imageSrc,
     rating: item.rating || "",
     type: "",
     chapter: item.latestChapter || "",

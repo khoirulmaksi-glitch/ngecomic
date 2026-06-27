@@ -1,528 +1,367 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useState, useRef, useEffect, useCallback, Fragment } from "react"
 import Link from "next/link"
-import dynamic from "next/dynamic"
-import type { HomeComicItem, HomeLatestUpdate } from "@/lib/api"
+import type { HomeComicItem, HomeLatestUpdate, HomeChapterItem } from "@/lib/api"
 import ComicImage from "@/components/ComicImage"
 
-const Beams = dynamic(() => import("@/components/beams/Beams"), { ssr: false })
+// ============================================================
+// Constants
+// ============================================================
 
-interface HomeClientProps {
+const GENRES = [
+  { label: "For You", key: "for-you" },
+  { label: "Romance", key: "romance" },
+  { label: "BL/GL", key: "bl-gl" },
+  { label: "Action", key: "action" },
+  { label: "Featured", key: "featured" },
+]
+
+interface SectionDef {
+  title: string
+  subtitle: string
+  dataKey: "trending" | "updates" | "ongoing"
+  slice: [number, number]
+  numbered?: boolean
+}
+
+const SECTIONS: SectionDef[] = [
+  { title: "Latest Trends", subtitle: "Most popular comics right now", dataKey: "trending", slice: [0, 8], numbered: true },
+  { title: "Most Raved Series", subtitle: "Fan favorites", dataKey: "ongoing", slice: [0, 8] },
+  { title: "New Arrivals for You", subtitle: "Fresh updates", dataKey: "updates", slice: [0, 8] },
+  { title: "Fall for You Now!", subtitle: "Romance picks", dataKey: "trending", slice: [4, 12] },
+  { title: "Hotblood Adventure", subtitle: "Action packed", dataKey: "ongoing", slice: [4, 12] },
+  { title: "BL/GL - Pride of US", subtitle: "Love is love", dataKey: "trending", slice: [8, 16] },
+  { title: "Eastern Love Tales", subtitle: "Asian romance", dataKey: "ongoing", slice: [8, 16] },
+  { title: "Specially For You", subtitle: "Recommended just for you", dataKey: "updates", slice: [4, 12] },
+]
+
+// ============================================================
+// Types
+// ============================================================
+
+interface Props {
   trending: HomeComicItem[]
   updates: HomeLatestUpdate[]
   ongoing: HomeComicItem[]
   imageMap: Record<string, string>
 }
 
-const genres = [
-  "Action", "Romance", "Fantasy", "Horror", "Comedy", "Drama",
-  "Sci-Fi", "Slice of Life", "Adventure", "Thriller",
-]
+// ============================================================
+// Helpers
+// ============================================================
 
-function realSrc(item: { slug: string; imageSrc: string }, imageMap: Record<string, string>): string {
-  return imageMap[item.slug] || item.imageSrc
+function isUpdateItem(item: HomeComicItem | HomeLatestUpdate): item is HomeLatestUpdate {
+  return "chapters" in item
 }
 
-export default function HomeClient({ trending, updates, ongoing, imageMap }: HomeClientProps) {
-  const [formState, setFormState] = useState({ name: "", email: "", message: "" })
-  const [submitted, setSubmitted] = useState(false)
-  const cursorRef = useRef<HTMLDivElement>(null)
+function getCoverUrl(item: HomeComicItem | HomeLatestUpdate, imageMap: Record<string, string>): string {
+  const slug = isUpdateItem(item) ? item.slug : item.slug
+  return imageMap[slug] || item.imageSrc
+}
 
-  useEffect(() => {
-    const move = (e: MouseEvent) => {
-      if (cursorRef.current) {
-        cursorRef.current.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`
-      }
-    }
-    window.addEventListener("mousemove", move)
-    return () => window.removeEventListener("mousemove", move)
-  }, [])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 3000)
+function getChapterLabel(item: HomeComicItem | HomeLatestUpdate): string {
+  if (isUpdateItem(item)) {
+    return item.chapters[0]?.title || ""
   }
+  return item.latestChapter || ""
+}
 
-  const trendingTop = trending.slice(0, 6)
-  const latestChapters = updates.slice(0, 6)
+// ============================================================
+// Genre Tab
+// ============================================================
+
+function GenreTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
+        active ? "text-[#303133]" : "text-[#c0c4cc] hover:text-[#606266]"
+      }`}
+    >
+      {label}
+      {active && (
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-[#07beb8] rounded-full" />
+      )}
+    </button>
+  )
+}
+
+// ============================================================
+// Comic Card
+// ============================================================
+
+interface ComicCardProps {
+  item: HomeComicItem | HomeLatestUpdate
+  imageMap: Record<string, string>
+  rank?: number
+  index?: number
+}
+
+function ComicCard({ item, imageMap, rank, index }: ComicCardProps) {
+  const title = item.title
+  const slug = item.slug
+  const img = getCoverUrl(item, imageMap)
+  const chapter = getChapterLabel(item)
+  const isNew = index !== undefined && index < 2
 
   return (
-    <>
-      <div
-        ref={cursorRef}
-        className="fixed w-2 h-2 bg-neon-pink rounded-full pointer-events-none z-[99999] mix-blend-difference hidden md:block"
-      />
+    <Link href={`/comic/${slug}`} className="group block">
+      <div className="relative overflow-hidden rounded-2xl bg-[#f5f5f5] aspect-[3/4] shadow-sm">
+        <ComicImage
+          src={img}
+          alt={title}
+          className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+        />
 
-      {/* Hero */}
-      <section className="relative min-h-[90vh] flex items-center border-b-3 border-brutal-white overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-40">
-          <Beams
-            beamWidth={1.5}
-            beamHeight={12}
-            beamNumber={10}
-            lightColor="#ff2d95"
-            speed={1.5}
-            noiseIntensity={1.5}
-            scale={0.15}
-            rotation={-15}
-          />
-        </div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,theme(colors.neon.pink/.08),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_48%,theme(colors.neon.cyan/.03)_50%,transparent_52%)] bg-[length:20px_20px]" />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 w-full">
-          <div className="max-w-4xl">
-            <div className="inline-block border-2 border-neon-pink px-4 py-2 mb-6 animate-reveal-up stagger-1">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-neon-pink">
-                Baca Manga Gratis
-              </span>
-            </div>
-
-            <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.85] animate-reveal-up stagger-2">
-              SELAMAT
-              <br />
-              <span className="text-neon-pink inline-block animate-float">DATANG</span>
-              <br />
-              DI NGECOMIC
-            </h1>
-
-            <p className="text-lg sm:text-xl text-zinc-400 max-w-xl mt-8 animate-reveal-up stagger-3 leading-relaxed">
-              Platform baca manga dan komik favoritmu dengan koleksi lengkap, update terbaru, dan pengalaman membaca yang brutal.
-            </p>
-
-            <div className="flex flex-wrap gap-4 mt-10 animate-reveal-up stagger-4">
-              <Link
-                href="#trending"
-                className="bg-brutal-white text-brutal-black font-black uppercase tracking-wider text-sm px-8 py-4 hover:bg-neon-pink hover:text-brutal-black transition-colors"
-              >
-                Mulai Baca
-              </Link>
-              <Link
-                href="/search"
-                className="border-3 border-brutal-white text-brutal-white font-black uppercase tracking-wider text-sm px-8 py-4 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-              >
-                Cari Komik
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-6 mt-16 text-zinc-600 text-xs font-mono animate-reveal-up stagger-5">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse-glow" />
-                {ongoing.length}+ Komik
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-neon-cyan rounded-full animate-pulse-glow" style={{ animationDelay: "0.5s" }} />
-                Update Harian
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-neon-yellow rounded-full animate-pulse-glow" style={{ animationDelay: "1s" }} />
-                Gratis Selamanya
-              </span>
-            </div>
+        {/* Rank badge */}
+        {rank !== undefined && (
+          <div className="absolute top-2 left-2 bg-[#07beb8] text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
+            #{rank}
           </div>
+        )}
 
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden xl:block">
-            <div className="space-y-4 text-right">
-              {["MANGA", "MANHWA", "MANHUA"].map((word, i) => (
-                <div
-                  key={word}
-                  className="text-7xl font-black text-brutal-white/5 tracking-tighter select-none"
-                  style={{ marginTop: i > 0 ? "-0.3em" : undefined }}
-                >
-                  {word}
-                </div>
-              ))}
-            </div>
+        {/* New badge */}
+        {isNew && rank === undefined && (
+          <div className="absolute top-2 left-2 bg-[#ff6b6b] text-white text-xs font-bold px-2 py-0.5 rounded-md shadow-lg">
+            New
           </div>
-        </div>
+        )}
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float">
-          <div className="w-6 h-10 border-2 border-zinc-700 rounded-full flex justify-center">
-            <div className="w-1 h-3 bg-zinc-500 rounded-full mt-2 animate-pulse-glow" />
-          </div>
-        </div>
-      </section>
-
-      {/* Trending */}
-      <section id="trending" className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-neon-pink font-mono text-sm font-bold">[01]</span>
-            <div className="h-0.5 flex-1 bg-brutal-white/20" />
-          </div>
-          <div className="flex items-end justify-between mb-16">
-            <div>
-              <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
-                Trending
-                <span className="text-neon-pink"> Now</span>
-              </h2>
-              <p className="text-zinc-400 max-w-xl text-lg">
-                Komik paling populer yang lagi ramai dibaca.
-              </p>
-            </div>
-            <Link
-              href="/populer"
-              className="hidden sm:inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-            {trendingTop.map((item) => (
-              <Link
-                key={item.slug}
-                href={`/comic/${item.slug}`}
-                className="group border-2 border-zinc-800 hover:border-neon-pink transition-colors bg-brutal-black overflow-hidden"
-              >
-                <div className="aspect-[3/4] overflow-hidden">
-                  <ComicImage
-                    src={realSrc(item, imageMap)}
-                    alt={item.title}
-                    className="w-full h-full group-hover:scale-105 transition duration-300"
-                  />
-                </div>
-                <div className="p-3">
-                  <h3 className="font-bold text-sm leading-tight line-clamp-2 text-brutal-white group-hover:text-neon-pink transition-colors">
-                    {item.title}
-                  </h3>
-                  <div className="flex items-center justify-between mt-1 text-xs">
-                    <span className="text-zinc-600 font-mono">{item.latestChapter || "-"}</span>
-                    {item.rating && (
-                      <span className="text-neon-yellow font-mono">{item.rating}</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center sm:hidden">
-            <Link
-              href="/populer"
-              className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Latest Updates */}
-      <section className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-neon-cyan font-mono text-sm font-bold">[02]</span>
-            <div className="h-0.5 flex-1 bg-brutal-white/20" />
-          </div>
-          <div className="flex items-end justify-between mb-16">
-            <div>
-              <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
-                Update
-                <span className="text-neon-cyan"> Terbaru</span>
-              </h2>
-              <p className="text-zinc-400 max-w-xl text-lg">
-                Chapter terbaru dari komik favoritmu, langsung update tiap hari.
-              </p>
-            </div>
-            <Link
-              href="/terbaru"
-              className="hidden sm:inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-
-          <div className="space-y-4">
-            {latestChapters.map((update) => (
-              <Link
-                key={update.slug}
-                href={`/comic/${update.slug}`}
-                className="group flex items-center gap-4 sm:gap-6 p-4 sm:p-6 border-2 border-zinc-800 hover:border-neon-cyan transition-colors"
-              >
-                <div className="shrink-0 w-12 h-16 sm:w-16 sm:h-20 overflow-hidden border border-zinc-700">
-                  <ComicImage
-                    src={imageMap[update.slug] || update.imageSrc}
-                    alt={update.title}
-                    className="w-full h-full"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base sm:text-lg font-bold group-hover:text-neon-cyan transition-colors truncate">
-                    {update.title}
-                  </h3>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {update.chapters.slice(0, 3).map((ch) => (
-                      <span
-                        key={ch.slug}
-                        className="text-xs bg-zinc-800 text-zinc-400 px-2 py-1 font-mono"
-                      >
-                        {ch.title}
-                        <span className="text-zinc-700 ml-1.5">{ch.timeAgo}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <span className="shrink-0 text-neon-cyan font-mono text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
-                  &rarr;
-                </span>
-              </Link>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center sm:hidden">
-            <Link
-              href="/terbaru"
-              className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <section className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { value: ongoing.length, label: "Total Komik", suffix: "+" },
-              { value: trending.length, label: "Sedang Trending", suffix: "" },
-              { value: updates.reduce((a, u) => a + u.chapters.length, 0), label: "Chapter Baru", suffix: "+" },
-              { value: "Gratis", label: "Biaya Baca", suffix: "" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center brutal-border py-8 px-4 bg-brutal-gray/30">
-                <div className="text-4xl sm:text-5xl font-black text-neon-cyan">
-                  {stat.value}
-                  <span className="text-neon-pink">{stat.suffix}</span>
-                </div>
-                <div className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-2">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Explore Genres */}
-      <section className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-neon-yellow font-mono text-sm font-bold">[03]</span>
-            <div className="h-0.5 flex-1 bg-brutal-white/20" />
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
-            Explore
-            <span className="text-neon-yellow"> Genre</span>
-          </h2>
-          <p className="text-zinc-400 max-w-xl mb-16 text-lg">
-            Cari komik berdasarkan genre favoritmu.
-          </p>
-
-          <div className="flex flex-wrap gap-3">
-            {genres.map((genre) => (
-              <Link
-                key={genre}
-                href={`/search?genre=${genre.toLowerCase()}`}
-                className="group border-2 border-zinc-800 px-5 py-3 hover:border-neon-yellow hover:bg-neon-yellow/5 transition-colors"
-              >
-                <span className="text-sm font-bold text-zinc-400 group-hover:text-neon-yellow transition-colors">
-                  {genre}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Ongoing Grid */}
-      <section className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-neon-green font-mono text-sm font-bold">[04]</span>
-            <div className="h-0.5 flex-1 bg-brutal-white/20" />
-          </div>
-          <div className="flex items-end justify-between mb-16">
-            <div>
-              <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
-                Semua
-                <span className="text-neon-green"> Komik</span>
-              </h2>
-              <p className="text-zinc-400 max-w-xl text-lg">
-                Koleksi lengkap komik yang tersedia di Ngecomic.
-              </p>
-            </div>
-            <Link
-              href="/search"
-              className="hidden sm:inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {ongoing.slice(0, 15).map((item) => (
-              <Link
-                key={item.slug}
-                href={`/comic/${item.slug}`}
-                className="group relative aspect-[3/4] border-2 border-zinc-800 hover:border-neon-green transition-colors overflow-hidden bg-brutal-gray"
-              >
-                <ComicImage
-                  src={realSrc(item, imageMap)}
-                  alt={item.title}
-                  className="absolute inset-0 w-full h-full group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-brutal-black via-brutal-black/80 to-transparent">
-                  <h3 className="text-xs sm:text-sm font-bold leading-tight group-hover:text-neon-green transition-colors line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-[10px] text-zinc-600 font-mono mt-1">
-                    {item.latestChapter || "Ongoing"}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          <div className="mt-10 text-center sm:hidden">
-            <Link
-              href="/search"
-              className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider border-2 border-brutal-white px-6 py-3 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-            >
-              Lihat Semua Komik
-              <span className="text-lg">&rarr;</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Request / Contact */}
-      <section id="request" className="border-b-3 border-brutal-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-neon-purple font-mono text-sm font-bold">[05]</span>
-            <div className="h-0.5 flex-1 bg-brutal-white/20" />
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
-            Request
-            <span className="text-neon-purple"> Komik</span>
-          </h2>
-          <p className="text-zinc-400 max-w-xl mb-16 text-lg">
-            Komik favoritmu belum ada di sini? Request aja, kami usahakan!
-          </p>
-
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
-            <div>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
-                    Nama Kamu
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formState.name}
-                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                    className="w-full bg-transparent border-2 border-zinc-700 focus:border-neon-purple px-4 py-3 text-brutal-white outline-none transition-colors font-mono text-sm"
-                    placeholder="Nama"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={formState.email}
-                    onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                    className="w-full bg-transparent border-2 border-zinc-700 focus:border-neon-purple px-4 py-3 text-brutal-white outline-none transition-colors font-mono text-sm"
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
-                    Judul Komik / Request
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={formState.message}
-                    onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                    className="w-full bg-transparent border-2 border-zinc-700 focus:border-neon-purple px-4 py-3 text-brutal-white outline-none transition-colors font-mono text-sm resize-none"
-                    placeholder="Tulis judul komik yang kamu mau..."
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-neon-purple text-brutal-white font-black uppercase tracking-wider text-sm px-8 py-4 hover:bg-brutal-white hover:text-brutal-black transition-colors"
-                >
-                  {submitted ? "Request Terkirim!" : "Kirim Request"}
-                </button>
-              </form>
-            </div>
-
-            <div className="space-y-8 lg:pt-0 pt-8">
-              <div className="border-2 border-zinc-800 p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-neon-pink mb-2">
-                  Koleksi
-                </h4>
-                <p className="text-lg font-mono text-brutal-white">
-                  {ongoing.length}+ Komik
-                </p>
-              </div>
-              <div className="border-2 border-zinc-800 p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-neon-cyan mb-2">
-                  Update
-                </h4>
-                <p className="text-lg font-mono text-brutal-white">
-                  Setiap Hari
-                </p>
-              </div>
-              <div className="border-2 border-zinc-800 p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-neon-green mb-2">
-                  Harga
-                </h4>
-                <p className="text-lg font-mono text-neon-green">
-                  Gratis
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
-          <div className="inline-block border-2 border-neon-pink px-6 py-3 mb-8">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-neon-pink">
-              Yuk Baca
+        {/* Chapter overlay */}
+        {chapter && rank === undefined && !isNew && (
+          <div className="absolute bottom-2 left-2 right-2">
+            <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded inline-block truncate max-w-full">
+              {chapter}
             </span>
           </div>
-          <h2 className="text-5xl sm:text-8xl font-black tracking-tighter leading-[0.85]">
-            RIBUAN
-            <br />
-            <span className="text-neon-pink">KOMIK</span>
-            <br />
-            SIAP DI BACA
-          </h2>
+        )}
+      </div>
+
+      <div className="mt-2 px-0.5">
+        <h3 className="text-sm font-medium text-[#303133] line-clamp-2 leading-tight group-hover:text-[#07beb8] transition-colors">
+          {title}
+        </h3>
+        {chapter && (
+          <p className="text-xs text-[#9fa2a8] mt-0.5 truncate">
+            {chapter}
+          </p>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+// ============================================================
+// Section
+// ============================================================
+
+interface SectionProps {
+  title: string
+  subtitle: string
+  items: (HomeComicItem | HomeLatestUpdate)[]
+  imageMap: Record<string, string>
+  numbered?: boolean
+}
+
+function ComicSection({ title, subtitle, items, imageMap, numbered }: SectionProps) {
+  if (items.length === 0) return null
+
+  return (
+    <section className="py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-[#303133]">{title}</h2>
+            <p className="text-sm text-[#9fa2a8] mt-0.5">{subtitle}</p>
+          </div>
           <Link
-            href="/search"
-            className="inline-block mt-10 bg-brutal-white text-brutal-black font-black uppercase tracking-wider text-sm px-10 py-5 hover:bg-neon-pink transition-colors"
+            href="/populer"
+            className="text-sm font-medium text-[#07beb8] hover:text-[#059b96] transition-colors shrink-0"
           >
-            Mulai Baca Sekarang
+            Read More &rarr;
           </Link>
         </div>
-      </section>
-    </>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+          {items.slice(0, numbered ? 8 : 12).map((item, i) => (
+            <ComicCard
+              key={`${item.slug}-${i}`}
+              item={item}
+              imageMap={imageMap}
+              rank={numbered ? i + 1 : undefined}
+              index={i}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ============================================================
+// Banner Carousel (WebComics card-style)
+// ============================================================
+
+function BannerCarousel({ items, imageMap }: { items: (HomeComicItem | HomeLatestUpdate)[]; imageMap: Record<string, string> }) {
+  const [current, setCurrent] = useState(0)
+  const length = items.length
+
+  const goTo = useCallback((i: number) => {
+    setCurrent(((i % length) + length) % length)
+  }, [length])
+
+  const next = useCallback(() => goTo(current + 1), [current, goTo])
+  const prev = useCallback(() => goTo(current - 1), [current, goTo])
+
+  useEffect(() => {
+    if (length < 2) return
+    const t = setInterval(next, 5000)
+    return () => clearInterval(t)
+  }, [next, length])
+
+  if (length === 0) return null
+
+  const activeItem = items[current]
+
+  return (
+    <section className="bg-white pt-6 sm:pt-8 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="relative">
+          {/* Viewport with card peek */}
+          <div className="overflow-hidden rounded-3xl">
+            <div
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${current * 100}%)` }}
+            >
+              {items.map((item, i) => {
+                const title = item.title
+                const slug = item.slug
+                const img = getCoverUrl(item, imageMap)
+                return (
+                  <Link
+                    key={slug}
+                    href={`/comic/${slug}`}
+                    className="relative min-w-full aspect-[21/9] sm:aspect-[21/8] group"
+                  >
+                    <ComicImage
+                      src={img}
+                      alt={title}
+                      className="w-full h-full"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10">
+                      <h2 className="text-2xl sm:text-4xl font-bold text-white drop-shadow-lg">
+                        {title}
+                      </h2>
+                      <div className="flex gap-2 mt-3">
+                        <span className="bg-[#07beb8] text-white text-xs font-semibold px-3 py-1 rounded-full">
+                          POPULAR
+                        </span>
+                        {"rating" in item && item.rating && (
+                          <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1 rounded-full">
+                            ★ {item.rating}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Arrows */}
+          <button
+            onClick={prev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white shadow-lg rounded-full flex items-center justify-center text-[#303133] hover:text-[#07beb8] transition-all z-10"
+            aria-label="Previous"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white shadow-lg rounded-full flex items-center justify-center text-[#303133] hover:text-[#07beb8] transition-all z-10"
+            aria-label="Next"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mt-4">
+            {items.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                  i === current ? "bg-[#07beb8] w-6" : "bg-[#e1e2e6] hover:bg-[#c0c4cc]"
+                }`}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ============================================================
+// Main HomeClient
+// ============================================================
+
+export default function HomeClient({ trending, updates, ongoing, imageMap }: Props) {
+  const [activeGenre, setActiveGenre] = useState("for-you")
+  const bannerItems = trending.length >= 5 ? trending.slice(0, 5) : ongoing.slice(0, 5)
+
+  const getSectionData = (dataKey: "trending" | "updates" | "ongoing", slice: [number, number]) => {
+    const data: (HomeComicItem | HomeLatestUpdate)[] =
+      dataKey === "trending" ? trending
+        : dataKey === "updates" ? updates
+        : ongoing
+    return data.slice(slice[0], slice[1])
+  }
+
+  return (
+    <div className="bg-white text-[#303133] min-h-screen">
+      {/* Sub-header genre tabs */}
+      <div className="bg-white/95 border-b border-[#e7e8ec]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center overflow-x-auto no-scrollbar">
+            {GENRES.map((g, i) => (
+              <Fragment key={g.key}>
+                <GenreTab
+                  label={g.label}
+                  active={activeGenre === g.key}
+                  onClick={() => setActiveGenre(g.key)}
+                />
+                {i < GENRES.length - 1 && (
+                  <div className="w-px h-4 bg-[#e1e2e6] shrink-0" />
+                )}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Banner Carousel */}
+      <BannerCarousel items={bannerItems} imageMap={imageMap} />
+
+      {/* Sections */}
+      {SECTIONS.map((sec) => (
+        <ComicSection
+          key={sec.title}
+          title={sec.title}
+          subtitle={sec.subtitle}
+          items={getSectionData(sec.dataKey, sec.slice)}
+          imageMap={imageMap}
+          numbered={sec.numbered}
+        />
+      ))}
+    </div>
   )
 }
