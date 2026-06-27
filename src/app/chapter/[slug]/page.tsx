@@ -20,11 +20,17 @@ export default async function ChapterPage({ params }: { params: Promise<{ slug: 
   const comicSlug = slug.replace(/-chapter-\d+$/, "")
   let comicTitle = chapter.title
   let comicImage = ""
+  let prevSlug = ""
+  let nextSlug = ""
 
   try {
     const comic = await getComicDetail(comicSlug)
     comicTitle = comic.title
     comicImage = comic.imageSrc
+    const chapters = comic.chapters || []
+    const currentIdx = chapters.findIndex(ch => ch.slug === slug)
+    if (currentIdx > 0) prevSlug = chapters[currentIdx - 1].slug
+    if (currentIdx >= 0 && currentIdx < chapters.length - 1) nextSlug = chapters[currentIdx + 1].slug
   } catch {
     // use chapter title
   }
@@ -36,6 +42,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ slug: 
       comicTitle={comicTitle}
       comicImage={comicImage}
       chapterSlug={slug}
+      prevSlug={prevSlug}
+      nextSlug={nextSlug}
     />
   )
 }
