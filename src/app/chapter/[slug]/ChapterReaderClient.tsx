@@ -38,7 +38,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
   const goTop = () => topRef.current?.scrollIntoView({ behavior: "smooth" })
 
   return (
-    <div ref={topRef} className="max-w-4xl mx-auto px-4 py-6">
+    <div ref={topRef} className="max-w-4xl mx-auto px-4 py-6 animate-reveal-up">
       {/* Header info */}
       <div className="mb-6">
         <Link
@@ -58,6 +58,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           {prevSlug ? (
             <Link
               href={`/chapter/${prevSlug}`}
+              prefetch={true}
               className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -79,6 +80,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           {nextSlug ? (
             <Link
               href={`/chapter/${nextSlug}`}
+              prefetch={true}
               className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity"
             >
               Next
@@ -114,6 +116,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           {prevSlug ? (
             <Link
               href={`/chapter/${prevSlug}`}
+              prefetch={true}
               className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -135,6 +138,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           {nextSlug ? (
             <Link
               href={`/chapter/${nextSlug}`}
+              prefetch={true}
               className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity"
             >
               Next Chapter
