@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { ChapterData } from "@/lib/api"
 import { proxyImage } from "@/lib/api"
@@ -18,7 +19,16 @@ interface Props {
 
 export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, comicImage, chapterSlug, prevSlug, nextSlug }: Props) {
   const { data: session } = useSession()
+  const router = useRouter()
   const topRef = useRef<HTMLDivElement>(null)
+  const [loading, setLoading] = useState(false)
+  const [loadingLabel, setLoadingLabel] = useState("")
+
+  // Prefetch next & prev routes on mount so RSC data is cached
+  useEffect(() => {
+    if (nextSlug) router.prefetch(`/chapter/${nextSlug}`)
+    if (prevSlug) router.prefetch(`/chapter/${prevSlug}`)
+  }, [router, nextSlug, prevSlug])
 
   useEffect(() => {
     if (session?.user) {
@@ -35,10 +45,53 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
     }
   }, [session, comicSlug, chapterSlug, comicTitle, comicImage])
 
+  // Keyboard shortcuts: ← prev, → next
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === "ArrowLeft" && prevSlug) {
+        e.preventDefault()
+        setLoading(true)
+        setLoadingLabel("Previous Chapter")
+        router.push(`/chapter/${prevSlug}`)
+      }
+      if (e.key === "ArrowRight" && nextSlug) {
+        e.preventDefault()
+        setLoading(true)
+        setLoadingLabel("Next Chapter")
+        router.push(`/chapter/${nextSlug}`)
+      }
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [router, prevSlug, nextSlug])
+
+  const smoothNav = (href: string, label: string) => {
+    setLoading(true)
+    setLoadingLabel(label)
+    router.push(href)
+  }
+
   const goTop = () => topRef.current?.scrollIntoView({ behavior: "smooth" })
 
   return (
-    <div ref={topRef} className="max-w-4xl mx-auto px-4 py-6 animate-reveal-up">
+    <div ref={topRef} className="max-w-4xl mx-auto px-4 py-6">
+      {/* Loading bar */}
+      <div className={`fixed top-0 left-0 right-0 z-[100] h-0.5 bg-brand transition-all duration-300 ${loading ? "opacity-100" : "opacity-0"}`}>
+        <div className="h-full bg-brand/40 w-full animate-loading-bar" />
+      </div>
+
+      {/* Loading overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-[99] bg-surface/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-sm text-muted mt-3 font-medium">{loadingLabel}...</p>
+          </div>
+        </div>
+      )}
+
+      <div className="animate-reveal-up">
       {/* Header info */}
       <div className="mb-6">
         <Link
@@ -56,16 +109,15 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
       <div className="sticky top-20 z-30 -mx-4 px-4 bg-surface/95 backdrop-blur-sm border-b border-outline mb-4">
         <div className="flex items-center justify-between gap-3 py-3">
           {prevSlug ? (
-            <Link
-              href={`/chapter/${prevSlug}`}
-              prefetch={true}
-              className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity"
+            <button
+              onClick={() => smoothNav(`/chapter/${prevSlug}`, "Previous Chapter")}
+              className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
               Prev
-            </Link>
+            </button>
           ) : (
             <div />
           )}
@@ -78,16 +130,15 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           </Link>
 
           {nextSlug ? (
-            <Link
-              href={`/chapter/${nextSlug}`}
-              prefetch={true}
-              className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity"
+            <button
+              onClick={() => smoothNav(`/chapter/${nextSlug}`, "Next Chapter")}
+              className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
             >
               Next
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </Link>
+            </button>
           ) : (
             <div />
           )}
@@ -114,16 +165,15 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
         {/* Sticky nav clone at bottom */}
         <div className="flex items-center justify-between gap-3">
           {prevSlug ? (
-            <Link
-              href={`/chapter/${prevSlug}`}
-              prefetch={true}
-              className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity"
+            <button
+              onClick={() => smoothNav(`/chapter/${prevSlug}`, "Previous Chapter")}
+              className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
               Previous Chapter
-            </Link>
+            </button>
           ) : (
             <div />
           )}
@@ -136,16 +186,15 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           </button>
 
           {nextSlug ? (
-            <Link
-              href={`/chapter/${nextSlug}`}
-              prefetch={true}
-              className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity"
+            <button
+              onClick={() => smoothNav(`/chapter/${nextSlug}`, "Next Chapter")}
+              className="flex items-center gap-2 px-5 py-3 bg-brand text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
             >
               Next Chapter
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </Link>
+            </button>
           ) : (
             <div />
           )}
@@ -158,6 +207,7 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           >
             Chapter List
           </Link>
+        </div>
         </div>
       </div>
     </div>
