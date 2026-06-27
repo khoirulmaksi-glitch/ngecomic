@@ -19,10 +19,12 @@ export default async function ChapterPage({ params }: { params: Promise<{ slug: 
 
   const comicSlug = slug.replace(/-chapter-\d+$/, "")
   let comicTitle = chapter.title
+  let comicImage = ""
 
   try {
     const comic = await getComicDetail(comicSlug)
     comicTitle = comic.title
+    comicImage = comic.imageSrc
   } catch {
     // use chapter title
   }
@@ -32,6 +34,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ slug: 
       chapter={chapter}
       comicSlug={comicSlug}
       comicTitle={comicTitle}
+      comicImage={comicImage}
       chapterSlug={slug}
     />
   )

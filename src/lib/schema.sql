@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS reading_history (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   comic_slug VARCHAR(255) NOT NULL,
+  comic_title VARCHAR(255),
+  comic_image VARCHAR(500),
   chapter_slug VARCHAR(255) NOT NULL,
   read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

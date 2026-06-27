@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { comic_slug, chapter_slug } = await request.json()
+  const { comic_slug, chapter_slug, comic_title, comic_image } = await request.json()
 
   if (!comic_slug || !chapter_slug) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 })
@@ -17,8 +17,9 @@ export async function POST(request: Request) {
   const userId = Number(session.user.id)
 
   await query(
-    "INSERT INTO reading_history (user_id, comic_slug, chapter_slug) VALUES ($1, $2, $3)",
-    [userId, comic_slug, chapter_slug]
+    `INSERT INTO reading_history (user_id, comic_slug, chapter_slug, comic_title, comic_image)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, comic_slug, chapter_slug, comic_title || null, comic_image || null]
   )
 
   await query(
@@ -50,4 +51,25 @@ export async function POST(request: Request) {
     level: newLevel,
     message: "Reading logged",
   })
+}
+
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const userId = Number(session.user.id)
+
+  const result = await query(
+    `SELECT DISTINCT ON (comic_slug)
+       comic_slug, chapter_slug, comic_title, comic_image, read_at
+     FROM reading_history
+     WHERE user_id = $1
+     ORDER BY comic_slug, read_at DESC
+     LIMIT 20`,
+    [userId]
+  )
+
+  return NextResponse.json(result.rows)
 }

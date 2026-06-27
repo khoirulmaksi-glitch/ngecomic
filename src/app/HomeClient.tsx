@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, Fragment } from "react"
 import Link from "next/link"
 import type { HomeComicItem, HomeLatestUpdate, HomeChapterItem } from "@/lib/api"
 import ComicImage from "@/components/ComicImage"
+import ContinueReading from "@/components/ContinueReading"
 
 // ============================================================
 // Constants
@@ -350,6 +351,9 @@ export default function HomeClient({ trending, updates, ongoing, imageMap }: Pro
 
       {/* Banner Carousel */}
       <BannerCarousel items={bannerItems} imageMap={imageMap} />
+
+      {/* Continue Reading */}
+      <ContinueReading />
 
       {/* Sections */}
       {SECTIONS.map((sec) => (
