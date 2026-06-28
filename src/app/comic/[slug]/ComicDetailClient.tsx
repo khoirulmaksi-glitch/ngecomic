@@ -17,6 +17,7 @@ function CommentSection({ slug }: { slug: string }) {
   const [comments, setComments] = useState<Comment[]>([])
   const [content, setContent] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   const loadComments = useCallback(async () => {
     try {
@@ -30,14 +31,18 @@ function CommentSection({ slug }: { slug: string }) {
 
   async function postComment() {
     if (!content.trim()) return
+    setError("")
     const res = await fetch("/api/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ comic_slug: slug, content: content.trim() }),
     })
+    const data = await res.json()
     if (res.ok) {
       setContent("")
       loadComments()
+    } else {
+      setError(data.error || "Gagal post komentar")
     }
   }
 
@@ -72,6 +77,10 @@ function CommentSection({ slug }: { slug: string }) {
         <p className="text-zinc-500 text-sm mb-8">
           <Link href="/login" className="text-neon-cyan hover:underline">Login</Link> to comment.
         </p>
+      )}
+
+      {error && (
+        <p className="text-brutal-red text-xs font-mono mb-4">{error}</p>
       )}
 
       {loading ? (

@@ -23,28 +23,34 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const userId = Number(session.user.id)
+    const { comic_slug, content, parent_id } = await request.json()
+
+    if (!comic_slug || !content?.trim()) {
+      return NextResponse.json({ error: "comic_slug and content required" }, { status: 400 })
+    }
+
+    if (content.trim().length > 1000) {
+      return NextResponse.json({ error: "Max 1000 characters" }, { status: 400 })
+    }
+
+    const result = await query(
+      `INSERT INTO comments (comic_slug, user_id, content, parent_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [comic_slug, userId, content.trim(), parent_id || null]
+    )
+
+    return NextResponse.json({ id: result.rows[0].id, message: "Comment added" }, { status: 201 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error("=== POST /api/comments error ===\n", msg)
+    return NextResponse.json({ error: "Gagal menyimpan komentar, coba /api/init dulu" }, { status: 500 })
   }
-
-  const userId = Number(session.user.id)
-  const { comic_slug, content, parent_id } = await request.json()
-
-  if (!comic_slug || !content?.trim()) {
-    return NextResponse.json({ error: "comic_slug and content required" }, { status: 400 })
-  }
-
-  if (content.trim().length > 1000) {
-    return NextResponse.json({ error: "Max 1000 characters" }, { status: 400 })
-  }
-
-  const result = await query(
-    `INSERT INTO comments (comic_slug, user_id, content, parent_id)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id`,
-    [comic_slug, userId, content.trim(), parent_id || null]
-  )
-
-  return NextResponse.json({ id: result.rows[0].id, message: "Comment added" }, { status: 201 })
 }
