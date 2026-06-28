@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { ChapterData } from "@/lib/api"
+import type { Comment } from "@/lib/types"
 import { proxyImage } from "@/lib/api"
 
 interface Props {
@@ -237,7 +238,106 @@ export default function ChapterReaderClient({ chapter, comicSlug, comicTitle, co
           </Link>
         </div>
         </div>
+
+        {/* Comment Section */}
+        <div className="mt-12 border-t border-outline pt-8">
+          <h3 className="text-lg font-bold text-on-surface mb-6">Comments</h3>
+          <CommentSection slug={comicSlug} />
+        </div>
       </div>
+    </div>
+  )
+}
+
+function CommentSection({ slug }: { slug: string }) {
+  const { data: session } = useSession()
+  const [comments, setComments] = useState<Comment[]>([])
+  const [content, setContent] = useState("")
+  const [loading, setLoading] = useState(true)
+
+  const loadComments = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/comments?slug=${encodeURIComponent(slug)}`)
+      if (res.ok) setComments(await res.json())
+    } catch {}
+    setLoading(false)
+  }, [slug])
+
+  useEffect(() => { loadComments() }, [loadComments])
+
+  async function postComment() {
+    if (!content.trim()) return
+    const res = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comic_slug: slug, content: content.trim() }),
+    })
+    if (res.ok) {
+      setContent("")
+      loadComments()
+    }
+  }
+
+  async function deleteComment(id: number) {
+    await fetch(`/api/comments/${id}`, { method: "DELETE" })
+    loadComments()
+  }
+
+  return (
+    <div>
+      {session?.user ? (
+        <div className="flex gap-3 mb-8">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Write a comment..."
+            maxLength={1000}
+            rows={3}
+            className="flex-1 bg-surface border border-outline text-on-surface px-4 py-3 text-sm outline-none focus:border-brand transition-colors resize-none rounded-lg"
+          />
+          <button
+            onClick={postComment}
+            disabled={!content.trim()}
+            className="self-end px-4 py-2 text-xs font-bold uppercase tracking-wider bg-brand text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            Post
+          </button>
+        </div>
+      ) : (
+        <p className="text-muted text-sm mb-8">
+          <Link href="/login" className="text-brand hover:underline">Login</Link> to comment.
+        </p>
+      )}
+
+      {loading ? (
+        <p className="text-muted font-mono text-sm">Loading comments...</p>
+      ) : comments.length === 0 ? (
+        <p className="text-muted font-mono text-sm">No comments yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {comments.map((c) => (
+            <div key={c.id} className="border border-outline rounded-lg px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-brand">{c.user_name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted font-mono">
+                    {new Date(c.created_at).toLocaleDateString("id-ID", { year: "numeric", month: "short", day: "numeric" })}
+                  </span>
+                  {(session?.user?.id === String(c.user_id) || session?.user?.role === "admin") && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      className="text-xs text-brutal-red hover:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-on-surface whitespace-pre-wrap">{c.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
