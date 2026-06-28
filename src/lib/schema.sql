@@ -55,6 +55,29 @@ CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 -- Migration: add banned column to existing databases
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE;
 
+CREATE TABLE IF NOT EXISTS friends (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  friend_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, friend_id)
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id SERIAL PRIMARY KEY,
+  comic_slug VARCHAR(255) NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_friends_user_id ON friends(user_id);
+CREATE INDEX IF NOT EXISTS idx_friends_friend_id ON friends(friend_id);
+CREATE INDEX IF NOT EXISTS idx_friends_status ON friends(status);
+CREATE INDEX IF NOT EXISTS idx_comments_comic_slug ON comments(comic_slug);
+
 -- Insert default admin if not exists (password: admin123)
 INSERT INTO users (name, email, password, role)
 SELECT 'Admin', 'admin@gmail.com', '$2b$10$sMdQioQIAKT5K58J0BhFrO00wfn4BfZdjhdw9QtWDWHBCu6yqGk8q', 'admin'

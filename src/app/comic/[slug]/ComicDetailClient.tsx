@@ -1,14 +1,110 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import type { MangaDetail } from "@/lib/api"
+import type { Comment } from "@/lib/types"
 import ComicImage from "@/components/ComicImage"
 
 interface Props {
   comic: MangaDetail
   slug: string
+}
+
+function CommentSection({ slug }: { slug: string }) {
+  const { data: session } = useSession()
+  const [comments, setComments] = useState<Comment[]>([])
+  const [content, setContent] = useState("")
+  const [loading, setLoading] = useState(true)
+
+  const loadComments = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/comments?slug=${encodeURIComponent(slug)}`)
+      if (res.ok) setComments(await res.json())
+    } catch {}
+    setLoading(false)
+  }, [slug])
+
+  useEffect(() => { loadComments() }, [loadComments])
+
+  async function postComment() {
+    if (!content.trim()) return
+    const res = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comic_slug: slug, content: content.trim() }),
+    })
+    if (res.ok) {
+      setContent("")
+      loadComments()
+    }
+  }
+
+  async function deleteComment(id: number) {
+    await fetch(`/api/comments/${id}`, { method: "DELETE" })
+    loadComments()
+  }
+
+  return (
+    <div className="border-t border-zinc-800 pt-8">
+      <h3 className="text-lg font-bold text-brutal-white mb-6">Comments ({comments.length})</h3>
+
+      {session?.user ? (
+        <div className="flex gap-3 mb-8">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Write a comment..."
+            maxLength={1000}
+            rows={3}
+            className="flex-1 bg-zinc-900 border border-zinc-700 text-brutal-white px-4 py-3 text-sm outline-none focus:border-neon-cyan transition-colors resize-none"
+          />
+          <button
+            onClick={postComment}
+            disabled={!content.trim()}
+            className="self-end px-4 py-2 text-xs font-bold uppercase tracking-wider bg-neon-cyan text-black hover:bg-brutal-white transition-colors disabled:opacity-50"
+          >
+            Post
+          </button>
+        </div>
+      ) : (
+        <p className="text-zinc-500 text-sm mb-8">
+          <Link href="/login" className="text-neon-cyan hover:underline">Login</Link> to comment.
+        </p>
+      )}
+
+      {loading ? (
+        <p className="text-zinc-500 font-mono text-sm">Loading comments...</p>
+      ) : comments.length === 0 ? (
+        <p className="text-zinc-600 font-mono text-sm">No comments yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {comments.map((c) => (
+            <div key={c.id} className="border border-zinc-800 px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-neon-cyan">{c.user_name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-600 font-mono">
+                    {new Date(c.created_at).toLocaleDateString("id-ID", { year: "numeric", month: "short", day: "numeric" })}
+                  </span>
+                  {(session?.user?.id === String(c.user_id) || session?.user?.role === "admin") && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      className="text-xs text-brutal-red hover:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap">{c.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ComicDetailClient({ comic, slug }: Props) {
@@ -162,6 +258,8 @@ export default function ComicDetailClient({ comic, slug }: Props) {
           )}
         </div>
       </div>
+
+      <CommentSection slug={slug} />
     </div>
   )
 }

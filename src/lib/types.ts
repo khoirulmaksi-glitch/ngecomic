@@ -43,6 +43,28 @@ export interface ApiLog {
   created_at: Date
 }
 
+export interface Friend {
+  id: number
+  user_id: number
+  friend_id: number
+  status: "pending" | "accepted"
+  created_at: string
+  friend_name?: string
+  friend_email?: string
+  friend_level?: number
+}
+
+export interface Comment {
+  id: number
+  comic_slug: string
+  user_id: number
+  content: string
+  parent_id: number | null
+  created_at: string
+  user_name?: string
+  user_level?: number
+}
+
 export interface ComicSource {
   title: string
   slug: string

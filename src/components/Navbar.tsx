@@ -213,6 +213,7 @@ export default function Navbar() {
             {session ? (
               <>
                 <Link href="/favorites" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Favorites</Link>
+                <Link href="/friends" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Friends</Link>
                 <Link href="/profile" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Profile</Link>
                 {session.user.role === "admin" && (
                   <Link href="/admin" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Admin</Link>
