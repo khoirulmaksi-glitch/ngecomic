@@ -138,15 +138,6 @@ export interface ChapterData {
   images: string[]
 }
 
-export interface Genre {
-  label: string
-  value: string
-}
-
-export function getGenres() {
-  return fetchFromAPI<{ genres: Genre[] }>("/komikstation/genres", { cache: "force-cache" })
-}
-
 export function getChapter(chapterSlug: string) {
   return fetchFromAPI<ChapterData>(`/komikstation/chapter/${chapterSlug}`, { cache: "no-store" })
 }

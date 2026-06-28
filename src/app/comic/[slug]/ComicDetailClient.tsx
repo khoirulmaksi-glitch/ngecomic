@@ -123,7 +123,7 @@ export default function ComicDetailClient({ comic, slug }: Props) {
               {comic.genres.map((g) => (
                 <Link
                   key={g.slug}
-                  href={`/genre/${g.slug}`}
+                  href={`/search?genre=${g.slug}`}
                   className="px-2.5 py-1 bg-zinc-800 text-neon-cyan text-xs font-mono border border-zinc-700 hover:bg-zinc-700 hover:text-white transition-colors"
                 >
                   {g.name}

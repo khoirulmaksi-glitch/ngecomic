@@ -66,15 +66,6 @@ export default function Navbar() {
                 </Link>
               ))}
 
-              <Link
-                href="/genre"
-                className={`text-sm font-bold uppercase tracking-widest hover:text-neon-cyan transition-colors relative group ${
-                  pathname.startsWith("/genre") ? "text-neon-cyan" : "text-brutal-white"
-                }`}
-              >
-                Genre
-                <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-neon-pink scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
-              </Link>
             </div>
 
             {/* Search bar */}
@@ -218,8 +209,7 @@ export default function Navbar() {
             <Link href="/populer" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Populer</Link>
             <Link href="/terbaru" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Terbaru</Link>
 
-            <Link href="/genre" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Genre</Link>
-
+            
             {session ? (
               <>
                 <Link href="/favorites" className="block text-sm font-bold uppercase tracking-widest" onClick={() => setMenuOpen(false)}>Favorites</Link>
