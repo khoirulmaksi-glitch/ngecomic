@@ -3,12 +3,11 @@ import { query } from "@/lib/db"
 import type { Comic } from "@/lib/types"
 
 const BASE = process.env.API_BASE_URL || "https://www.sankavollerei.web.id"
-const CACHE_TTL = 300
-const FETCH_TIMEOUT = 6000
-
-const PROXY_SERVICES = [
-  "https://api.allorigins.win/raw?url=",
-]
+const CACHE_TTL = 3600
+const FETCH_TIMEOUT = 4000
+const IMG_RESOLVE_TIMEOUT = 3000
+const MAX_COMICS_PER_GENRE = 20
+const FETCH_CONCURRENCY = 5
 
 interface GenreItem {
   label: string
@@ -53,9 +52,9 @@ function toComic(item: any): Comic | null {
   }
 }
 
-async function fetchJson(url: string, label: string): Promise<any> {
+async function fetchTimeout(url: string, timeout: number): Promise<Response | null> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  const id = setTimeout(() => controller.abort(), timeout)
   try {
     const res = await fetch(url, {
       headers: {
@@ -63,44 +62,46 @@ async function fetchJson(url: string, label: string): Promise<any> {
       },
       signal: controller.signal,
     })
-    clearTimeout(timeout)
-    if (!res.ok) {
-      console.error(`  fetchJson ${label}: HTTP ${res.status} from ${url.slice(0, 80)}`)
-      return null
-    }
-    return res.json()
-  } catch (e) {
-    clearTimeout(timeout)
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error(`  fetchJson ${label}: ${msg} (${url.slice(0, 80)})`)
+    clearTimeout(id)
+    return res.ok ? res : null
+  } catch {
+    clearTimeout(id)
     return null
   }
 }
 
 async function fetchFromExternal(path: string): Promise<any> {
   const targetUrl = `${BASE}/comic/${path}`
-  const urls = [targetUrl, ...PROXY_SERVICES.map(s => `${s}${encodeURIComponent(targetUrl)}`)]
-  for (let i = 0; i < urls.length; i++) {
-    const label = `path=${path} attempt=${i}`
-    const data = await fetchJson(urls[i], label)
-    if (data) return data
+  const res = await fetchTimeout(targetUrl, FETCH_TIMEOUT)
+  if (res) return res.json()
+  const services = ["https://api.allorigins.win/raw?url="]
+  for (const s of services) {
+    const proxyRes = await fetchTimeout(`${s}${encodeURIComponent(targetUrl)}`, FETCH_TIMEOUT)
+    if (proxyRes) return proxyRes.json()
   }
   return null
+}
+
+async function resolveComicImage(slug: string): Promise<string | null> {
+  const url = `${BASE}/comic/komikstation/manga/${slug}`
+  const res = await fetchTimeout(url, IMG_RESOLVE_TIMEOUT)
+  if (!res) return null
+  try {
+    const data = await res.json()
+    return data.imageSrc?.startsWith("data:") ? null : data.imageSrc || null
+  } catch {
+    return null
+  }
 }
 
 async function resolveComicImages(comics: Comic[]): Promise<Comic[]> {
   const slugs = comics.filter(c => c.image.startsWith("data:")).map(c => c.slug)
   if (slugs.length === 0) return comics
 
-  const results = await Promise.allSettled(
-    slugs.map(slug => fetchFromExternal(`komikstation/manga/${slug}`))
-  )
-
   const map = new Map<string, string>()
-  results.forEach((res, i) => {
-    if (res.status === "fulfilled" && res.value?.imageSrc && !res.value.imageSrc.startsWith("data:")) {
-      map.set(slugs[i], res.value.imageSrc)
-    }
+  const results = await Promise.allSettled(slugs.map(s => resolveComicImage(s)))
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled" && r.value) map.set(slugs[i], r.value)
   })
 
   return comics.map(c => ({ ...c, image: map.get(c.slug) || c.image }))
@@ -108,103 +109,87 @@ async function resolveComicImages(comics: Comic[]): Promise<Comic[]> {
 
 async function fetchGenreComics(slug: string): Promise<Comic[]> {
   const data = await fetchFromExternal(`komikstation/genre/${encodeURIComponent(slug)}`)
-  if (data) {
-    const items = extractResults(data)
-    if (items.length > 0) {
-      const comics = items.map(toComic).filter(Boolean) as Comic[]
-      return resolveComicImages(comics)
-    }
-  }
-  return []
+  if (!data) return []
+  const items = extractResults(data)
+  if (items.length === 0) return []
+  const comics = items.map(toComic).filter(Boolean) as Comic[]
+  return resolveComicImages(comics.slice(0, MAX_COMICS_PER_GENRE))
 }
 
 async function buildGenreData(): Promise<GenreData[]> {
-  console.error("  buildGenreData: fetching genre list...")
   const genreData = await fetchFromExternal("komikstation/genres")
-  if (!genreData) {
-    console.error("  buildGenreData: FAILED to fetch genre list from all endpoints")
-    return []
-  }
+  if (!genreData) return []
   const genres: GenreItem[] = genreData.genres || []
-  console.error(`  buildGenreData: got ${genres.length} genres`)
   if (genres.length === 0) return []
 
-  const results = await Promise.allSettled(
-    genres.map(async (g) => {
-      const slug = g.label.toLowerCase()
-      const comics = await fetchGenreComics(slug)
-      return { slug, label: g.label, comics }
-    })
-  )
-
-  const out: GenreData[] = []
-  for (const r of results) {
-    if (r.status === "fulfilled" && r.value.comics.length > 0) {
-      out.push(r.value)
+  const results: GenreData[] = []
+  for (let i = 0; i < genres.length; i += FETCH_CONCURRENCY) {
+    const batch = genres.slice(i, i + FETCH_CONCURRENCY)
+    const settled = await Promise.allSettled(
+      batch.map(async (g) => {
+        const slug = g.label.toLowerCase()
+        const comics = await fetchGenreComics(slug)
+        return { slug, label: g.label, comics }
+      })
+    )
+    for (const r of settled) {
+      if (r.status === "fulfilled" && r.value.comics.length > 0) {
+        results.push(r.value)
+      }
     }
   }
-  return out
+  return results
 }
 
 export async function GET() {
   try {
-    // Try cache first — single SQL query
-    console.error("=== GET /api/genre-data: checking DB cache ===")
     let cached
     try {
       cached = await query(
         "SELECT data, updated_at FROM genre_page_cache WHERE id = 1"
       )
-    } catch (dbErr) {
-      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr)
-      console.error("=== DB cache query failed ===\n", msg)
-      // Table may not exist — proceed without cache
+    } catch {
       cached = { rows: [] }
     }
 
     if (cached.rows.length > 0) {
       const { data, updated_at } = cached.rows[0]
       const age = (Date.now() - new Date(updated_at).getTime()) / 1000
-      console.error(`  cache hit, age=${age.toFixed(0)}s`)
+
       if (age < CACHE_TTL) {
         return NextResponse.json(data)
       }
-      console.error("  cache stale, refetching...")
-    } else {
-      console.error("  cache empty, fetching fresh data...")
+
+      // Stale-while-revalidate: serve stale cache, refresh in background
+      buildGenreData()
+        .then(fresh => {
+          query(
+            `INSERT INTO genre_page_cache (id, data, updated_at)
+             VALUES (1, $1::jsonb, NOW())
+             ON CONFLICT (id)
+             DO UPDATE SET data = $1::jsonb, updated_at = NOW()`,
+            [JSON.stringify({ genres: fresh })]
+          ).catch(() => {})
+        })
+        .catch(err => console.error("Background refresh failed:", err))
+
+      return NextResponse.json(data)
     }
 
-    // Cache miss or stale — fetch fresh data (with overall timeout)
-    const data = await (async () => {
-      let timer: ReturnType<typeof setTimeout>
-      const result = await Promise.race([
-        buildGenreData(),
-        new Promise<GenreData[]>((_, reject) => {
-          timer = setTimeout(() => reject(new Error("Global fetch timeout")), 25000)
-        }),
-      ])
-      clearTimeout(timer!)
-      return result
-    })()
+    // No cache — wait for fresh data
+    const freshData = await buildGenreData()
+    await query(
+      `INSERT INTO genre_page_cache (id, data, updated_at)
+       VALUES (1, $1::jsonb, NOW())
+       ON CONFLICT (id)
+       DO UPDATE SET data = $1::jsonb, updated_at = NOW()`,
+      [JSON.stringify({ genres: freshData })]
+    ).catch(() => {})
 
-    // Store in cache (single INSERT or UPDATE)
-    try {
-      await query(
-        `INSERT INTO genre_page_cache (id, data, updated_at)
-         VALUES (1, $1::jsonb, NOW())
-         ON CONFLICT (id)
-         DO UPDATE SET data = $1::jsonb, updated_at = NOW()`,
-        [JSON.stringify({ genres: data })]
-      )
-    } catch (storeErr) {
-      const msg = storeErr instanceof Error ? storeErr.message : String(storeErr)
-      console.error("=== DB cache store failed (non-fatal) ===\n", msg)
-    }
-
-    return NextResponse.json({ genres: data })
+    return NextResponse.json({ genres: freshData })
   } catch (e) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e)
     console.error("=== Genre data fetch failed ===\n", msg)
-    return NextResponse.json({ error: "Failed to load genre data", detail: msg }, { status: 500 })
+    return NextResponse.json({ error: "Failed to load genre data" }, { status: 500 })
   }
 }
