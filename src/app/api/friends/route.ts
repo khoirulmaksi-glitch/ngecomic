@@ -2,7 +2,24 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { query } from "@/lib/db"
 
+async function ensureTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS friends (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      friend_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, friend_id)
+    )
+  `)
+  await query("CREATE INDEX IF NOT EXISTS idx_friends_user_id ON friends(user_id)")
+  await query("CREATE INDEX IF NOT EXISTS idx_friends_friend_id ON friends(friend_id)")
+  await query("CREATE INDEX IF NOT EXISTS idx_friends_status ON friends(status)")
+}
+
 export async function GET() {
+  await ensureTable()
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -24,6 +41,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  await ensureTable()
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -79,6 +97,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  await ensureTable()
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

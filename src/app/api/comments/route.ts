@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { query } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
+  await ensureTable()
+
   const slug = request.nextUrl.searchParams.get("slug")
   if (!slug) {
     return NextResponse.json({ error: "slug required" }, { status: 400 })
@@ -22,8 +24,24 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.rows)
 }
 
+async function ensureTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id SERIAL PRIMARY KEY,
+      comic_slug VARCHAR(255) NOT NULL,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query("CREATE INDEX IF NOT EXISTS idx_comments_comic_slug ON comments(comic_slug)")
+}
+
 export async function POST(request: Request) {
   try {
+    await ensureTable()
+
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -51,6 +69,6 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error("=== POST /api/comments error ===\n", msg)
-    return NextResponse.json({ error: "Gagal menyimpan komentar, coba /api/init dulu" }, { status: 500 })
+    return NextResponse.json({ error: "Gagal menyimpan komentar" }, { status: 500 })
   }
 }
